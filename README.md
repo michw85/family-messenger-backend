@@ -32,30 +32,32 @@ Real-time family messaging backend built with Spring Boot.
 ## 📁 Project Structure
 
 src/main/java/com/familymessenger/backend/
-├── config/        # Spring configurations
-├── controller/    # REST & WebSocket controllers
-├── dto/          # Data transfer objects
-├── entity/       # JPA entities
-├── repository/   # Data repositories
-├── security/     # JWT & Security config
-└── service/      # Business logic
+- ├── config/        # Spring configurations
+- ├── controller/    # REST & WebSocket controllers
+- ├── dto/          # Data transfer objects
+- ├── entity/       # JPA entities
+- ├── repository/   # Data repositories
+- ├── security/     # JWT & Security config
+- └── service/      # Business logic
 
 ## 🔗 API Endpoints
-Method	Endpoint			Description
-POST	/api/auth/register	User registration
-POST	/api/auth/login		User login
-GET	/api/users/me		Get current user
-WS	/ws			WebSocket connection
+- Method	Endpoint			Description
+- POST	/api/auth/register	User registration
+- POST	/api/auth/login		User login
+- GET	/api/users/me		Get current user
+- WS	/ws			WebSocket connection
 
 ##🗄️ Environment Variables
-Create application-local.properties:
-jwt.secret=your_secret_key
-jwt.expiration=86400000
+- Create application-local.properties:
+- jwt.secret=your_secret_key
+- jwt.expiration=86400000
 
 ##📄 License 
+
 MIT
 
 ## 👨‍💻 Author
+
 Mykhailo Vorontsov
 
 ## 🔧 Quick Start
