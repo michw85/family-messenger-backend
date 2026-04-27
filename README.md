@@ -29,7 +29,8 @@ Real-time family messaging backend built with Spring Boot.
 - Java 17
 - Gradle 8.5+
 
-- 📁 Project Structure
+## 📁 Project Structure
+
 src/main/java/com/familymessenger/backend/
 ├── config/        # Spring configurations
 ├── controller/    # REST & WebSocket controllers
@@ -39,22 +40,22 @@ src/main/java/com/familymessenger/backend/
 ├── security/     # JWT & Security config
 └── service/      # Business logic
 
-🔗 API Endpoints
+## 🔗 API Endpoints
 Method	Endpoint			Description
 POST	/api/auth/register	User registration
 POST	/api/auth/login		User login
 GET	/api/users/me		Get current user
 WS	/ws			WebSocket connection
 
-🗄️ Environment Variables
+##🗄️ Environment Variables
 Create application-local.properties:
 jwt.secret=your_secret_key
 jwt.expiration=86400000
 
-📄 License
+##📄 License 
 MIT
 
-👨‍💻 Author
+## 👨‍💻 Author
 Mykhailo Vorontsov
 
 ## 🔧 Quick Start
