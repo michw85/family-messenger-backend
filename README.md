@@ -41,18 +41,20 @@ src/main/java/com/familymessenger/backend/
 - └── service/      # Business logic
 
 ## 🔗 API Endpoints
+
 - Method	Endpoint			Description
 - POST	/api/auth/register	User registration
 - POST	/api/auth/login		User login
 - GET	/api/users/me		Get current user
 - WS	/ws			WebSocket connection
 
-##🗄️ Environment Variables
+## 🗄️ Environment Variables
+
 - Create application-local.properties:
 - jwt.secret=your_secret_key
 - jwt.expiration=86400000
 
-##📄 License 
+## 📄 License 
 
 MIT
 
