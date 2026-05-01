@@ -32,6 +32,7 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())                              // Отключаем CSRF (для REST API) / Disable CSRF for REST API
+                .headers(headers -> headers.frameOptions(frameOptions -> frameOptions.disable())) // Для H2
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS) // Без сессий (используем JWT) / Stateless (using JWT)
                 )
@@ -40,6 +41,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**", "/ws/**", "/ws").permitAll()
                         // Swagger UI (если добавим позже) / Swagger UI (if added later)
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                        // files - download
+                        .requestMatchers("/api/auth/**", "/ws/**", "/ws", "/api/files/download/**").permitAll()
+                        // DB - H2
+                        .requestMatchers("/h2-console/**", "/ws/**", "/api/auth/**").permitAll()
                         // Все остальные запросы требуют авторизации / All other requests require authentication
                         .anyRequest().authenticated()
                 )

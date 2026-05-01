@@ -1,14 +1,16 @@
 package com.familymessenger.backend.dto;
 
-import lombok.Builder;
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
  * DTO для ответа аутентификации (JWT токен + данные пользователя)
  * DTO for authentication response (JWT token + user data)
  */
 @Data
-@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class AuthResponse {
 
     private String token;       // JWT токен для авторизации / JWT token for authorization
