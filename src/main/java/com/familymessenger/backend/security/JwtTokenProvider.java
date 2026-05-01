@@ -13,23 +13,24 @@ import java.util.Date;
  * Провайдер для работы с JWT токенами
  * Provider for JWT token operations
  */
-@Slf4j
-@Component
+@Slf4j  // Для логирования (можно писать log.info(), log.error())
+@Component // Spring создаст один экземпляр этого класса и будет его использовать везде
 public class JwtTokenProvider {
 
+    // Берём значение из application.properties - We take the value from application.properties
     @Value("${jwt.secret}")
-    private String jwtSecret;
+    private String jwtSecret; // Секретный ключ для подписи токенов (должен быть длинным и сложным) - Secret key for signing tokens (must be long and complex)
 
     @Value("${jwt.expiration}")
-    private int jwtExpiration;
+    private int jwtExpiration; // Время жизни токена в миллисекундах (86400000 = 24 часа) - Token lifetime in milliseconds (86400000 = 24 hours)
 
     /**
      * Получение ключа для подписи токена
      * Getting the key for token signing
      */
     private Key getSigningKey() {
-        byte[] keyBytes = jwtSecret.getBytes();
-        return Keys.hmacShaKeyFor(keyBytes);
+        byte[] keyBytes = jwtSecret.getBytes(); // Превращаем строку-секрет в массив байтов - convert the secret string into a byte array
+        return Keys.hmacShaKeyFor(keyBytes); // Создаём криптографический ключ для подписи HS512 - Creating a cryptographic key for HS512 signing
     }
 
     /**
