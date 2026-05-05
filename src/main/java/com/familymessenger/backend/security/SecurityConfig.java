@@ -12,6 +12,10 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import java.util.Arrays;
 
 /**
  * Конфигурация безопасности Spring Security
@@ -27,6 +31,13 @@ public class SecurityConfig {
     /**
      * Настройка цепочки фильтров безопасности
      * Security filter chain configuration
+     *
+     * - Отключаем CSRF (для REST API используется JWT) / Disable CSRF (JWT for REST API)
+     * - Настраиваем CORS для мобильного приложения / Configure CORS for mobile app
+     * - Отключаем X-Frame-Options для H2 консоли / Disable X-Frame-Options for H2 console
+     * - Делаем сессии stateless (без сессий на сервере) / Stateless sessions (no server sessions)
+     * - Открываем доступ для эндпоинтов авторизации, WebSocket и H2 консоли / Open access for auth, WebSocket and H2 endpoints
+     * - Все остальные запросы требуют аутентификации через JWT / All other requests require JWT authentication
      */
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -72,5 +83,41 @@ public class SecurityConfig {
     public AuthenticationManager authenticationManager(
             AuthenticationConfiguration authenticationConfiguration) throws Exception {
         return authenticationConfiguration.getAuthenticationManager();
+    }
+
+    /**
+     * Настройка CORS (Cross-Origin Resource Sharing) для разрешения запросов с мобильного приложения
+     * CORS (Cross-Origin Resource Sharing) configuration to allow requests from mobile app
+     *
+     * Разрешаем запросы с любых источников (для разработки, позже ограничим доменом)
+     * Allow requests from any origin (for development, later restrict to specific domain)
+     *
+     * @return источник CORS конфигурации / CORS configuration source
+     */
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+
+        // Разрешаем запросы с любых источников (для разработки с мобильных устройств)
+        // Allow requests from any origin (for mobile development)
+        configuration.setAllowedOrigins(Arrays.asList("*"));
+
+        // Разрешаем HTTP методы, которые использует приложение
+        // Allow HTTP methods used by the application
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+
+        // Разрешаем все заголовки
+        // Allow all headers
+        configuration.setAllowedHeaders(Arrays.asList("*"));
+
+        // Разрешаем отправку учётных данных (cookies, авторизация)
+        // Allow sending credentials (cookies, authorization)
+        configuration.setAllowCredentials(true);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        // Применяем CORS настройки ко всем эндпоинтам
+        // Apply CORS settings to all endpoints
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
     }
 }

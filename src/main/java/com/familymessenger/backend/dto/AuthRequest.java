@@ -16,7 +16,6 @@ public class AuthRequest {
     @Size(min = 3, max = 50, message = "Username must be between 3 and 50 characters / Имя пользователя должно быть от 3 до 50 символов")
     private String username;
 
-    @NotBlank(message = "Email is required / Email обязателен")
     @Email(message = "Invalid email format / Неверный формат email")
     private String email;
 

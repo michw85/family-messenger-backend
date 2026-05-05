@@ -2,6 +2,7 @@ package com.familymessenger.backend.controller;
 
 import com.familymessenger.backend.dto.AuthRequest;
 import com.familymessenger.backend.dto.AuthResponse;
+import com.familymessenger.backend.dto.LoginRequest;
 import com.familymessenger.backend.dto.UserDto;
 import com.familymessenger.backend.entity.User;
 import com.familymessenger.backend.security.JwtTokenProvider;
@@ -91,7 +92,7 @@ public class AuthController {
      * @return токен и данные пользователя / token and user data
      */
     @PostMapping("/login")
-    public ResponseEntity<?> login(@Valid @RequestBody AuthRequest request) {
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
 
         log.info("Login attempt for username: {}", request.getUsername());
 
