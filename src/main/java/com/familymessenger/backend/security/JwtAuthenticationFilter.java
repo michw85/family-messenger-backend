@@ -33,6 +33,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
+        // Пропускаем WebSocket запросы без проверки
+        String path = request.getRequestURI();
+        if (path.startsWith("/ws") || path.contains("sockjs")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
 
         try {
             // Извлекаем JWT токен из заголовка Authorization

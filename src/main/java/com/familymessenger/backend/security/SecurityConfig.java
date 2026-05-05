@@ -15,6 +15,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
 import java.util.Arrays;
 
 /**
@@ -42,6 +43,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())                              // Отключаем CSRF (для REST API) / Disable CSRF for REST API
                 .headers(headers -> headers.frameOptions(frameOptions -> frameOptions.disable())) // Для H2
                 .sessionManagement(session -> session
@@ -52,10 +54,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**", "/ws/**", "/ws").permitAll()
                         // Swagger UI (если добавим позже) / Swagger UI (if added later)
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
-                        // files - download
-                        .requestMatchers("/api/auth/**", "/ws/**", "/ws", "/api/files/download/**").permitAll()
-                        // DB - H2
-                        .requestMatchers("/h2-console/**", "/ws/**", "/api/auth/**").permitAll()
+                        // Файлы - скачивание / Files - download
+                        .requestMatchers("/api/files/download/**").permitAll()
+                        // База данных - H2 консоль / Database - H2 console
+                        .requestMatchers("/h2-console/**").permitAll()
                         // Все остальные запросы требуют авторизации / All other requests require authentication
                         .anyRequest().authenticated()
                 )
