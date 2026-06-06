@@ -134,4 +134,50 @@ public class ChatService {
 
         return messageRepository.findByChatRoomOrderByTimestampDesc(chatRoom, Pageable.ofSize(limit));
     }
+
+    /**
+     * Получить все чаты, в которых участвует пользователь
+     * Get all chats where user participates
+     */
+    public List<ChatRoom> getChatsForUser(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        return chatRoomRepository.findByParticipantsContaining(user);
+    }
+
+    /**
+     * Создать новый чат (групповой/семейный)
+     * Create new group/family chat
+     */
+    @Transactional
+    public ChatRoom createChat(String name, ChatRoom.RoomType type, Long creatorId) {
+        User creator = userRepository.findById(creatorId)
+                .orElseThrow(() -> new RuntimeException("Creator not found"));
+
+        ChatRoom chatRoom = new ChatRoom();
+        chatRoom.setName(name);
+        chatRoom.setType(type);
+        chatRoom.setCreatedBy(creator);
+        chatRoom.getParticipants().add(creator);
+
+        return chatRoomRepository.save(chatRoom);
+    }
+
+    /**
+     * Удалить чат, если пользователь является создателем
+     * Delete chat if user is creator
+     */
+    @Transactional
+    public void deleteChat(String chatId, Long userId) {
+        ChatRoom chatRoom = chatRoomRepository.findById(chatId)
+                .orElseThrow(() -> new RuntimeException("Chat not found"));
+
+        if (!chatRoom.getCreatedBy().getId().equals(userId)) {
+            throw new RuntimeException("Only creator can delete chat");
+        }
+
+        // Можно также удалить все сообщения (каскадно, если настроено в JPA)
+        chatRoomRepository.delete(chatRoom);
+        log.info("Chat deleted: {}", chatId);
+    }
 }
