@@ -29,4 +29,5 @@ jobs:
           script: |
             cd /app/backend
             docker-compose down
-            docker-compose up --build -d
+            docker rm -f family-messenger-backend || true
+            docker-compose up -d --build
