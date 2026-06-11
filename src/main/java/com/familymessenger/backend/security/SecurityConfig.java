@@ -60,10 +60,10 @@ public class SecurityConfig {
                         .requestMatchers("/h2-console/**").permitAll()
                         // Все остальные запросы требуют авторизации / All other requests require authentication
                         .anyRequest().authenticated()
-                );
+                )
                 // Добавляем наш JWT фильтр перед стандартным фильтром
                 // Add our JWT filter before the standard filter
-//                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 
