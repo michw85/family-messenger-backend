@@ -10,6 +10,7 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
       - name: Copy files to server
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -18,6 +19,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: "."
           target: "/app/backend"
+
       - name: SSH and deploy
         uses: appleboy/ssh-action@v1.0.3
         with:
