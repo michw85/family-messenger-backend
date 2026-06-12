@@ -1,8 +1,10 @@
 package com.familymessenger.backend.controller;
 
 import com.familymessenger.backend.dto.ChatRoomDto;
+import com.familymessenger.backend.dto.ChatMessageDto;
 import com.familymessenger.backend.dto.CreateChatRequest;
 import com.familymessenger.backend.entity.ChatRoom;
+import com.familymessenger.backend.entity.Message;
 import com.familymessenger.backend.entity.User;
 import com.familymessenger.backend.service.ChatService;
 import lombok.RequiredArgsConstructor;
@@ -38,12 +40,10 @@ public class ChatRoomController {
     @GetMapping
     public ResponseEntity<List<ChatRoomDto>> getUserChats(@AuthenticationPrincipal User user) {
         log.info("Fetching chats for user: {}", user.getUsername());
-
         List<ChatRoom> chats = chatService.getChatsForUser(user.getId());
         List<ChatRoomDto> dtos = chats.stream()
                 .map(ChatRoomDto::fromEntity)
                 .collect(Collectors.toList());
-
         return ResponseEntity.ok(dtos);
     }
 
@@ -59,13 +59,20 @@ public class ChatRoomController {
     public ResponseEntity<ChatRoomDto> createChat(@Valid @RequestBody CreateChatRequest request,
                                                   @AuthenticationPrincipal User user) {
         log.info("Creating new chat '{}' by user: {}", request.getName(), user.getUsername());
-
-        ChatRoom chat = chatService.createChat(
-                request.getName(),
-                request.getType(),
-                user.getId()
-        );
+        ChatRoom chat = chatService.createChat(request.getName(), request.getType(), user.getId());
         return ResponseEntity.status(HttpStatus.CREATED).body(ChatRoomDto.fromEntity(chat));
+    }
+
+    @GetMapping("/{chatId}/messages")
+    public ResponseEntity<List<ChatMessageDto>> getMessages(@PathVariable String chatId,
+                                                            @RequestParam(defaultValue = "50") int size,
+                                                            @AuthenticationPrincipal User user) {
+        log.info("Fetching messages for chat: {} by user: {}", chatId, user.getUsername());
+        List<Message> messages = chatService.getMessageHistory(chatId, size);
+        List<ChatMessageDto> dtos = messages.stream()
+                .map(ChatMessageDto::fromEntity)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(dtos);
     }
 
     /**
