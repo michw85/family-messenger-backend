@@ -37,7 +37,15 @@ public class CustomUserDetailsService implements UserDetailsService {
 
         // Ищем пользователя по username или email
         // Find user by username or email
-        User user = userRepository.findByUsername(username)
+
+        return userRepository.findByUsername(username)
+                .or(() -> userRepository.findByEmail(username))
+                .orElseThrow(() -> {
+                    log.error("User not found with username/email: {}", username);
+                    return new UsernameNotFoundException("User not found: " + username);
+                });
+
+        /* User user = userRepository.findByUsername(username)
                 .or(() -> userRepository.findByEmail(username))
                 .orElseThrow(() -> {
                     log.error("User not found with username/email: {}", username);
@@ -58,6 +66,6 @@ public class CustomUserDetailsService implements UserDetailsService {
                 user.getUsername(),    // username для аутентификации / username for authentication
                 user.getPassword(),    // зашифрованный пароль / encrypted password
                 authorities            // права и роли / roles and authorities
-        );
+        );*/
     }
 }
