@@ -45,7 +45,8 @@ public class MessageController {
                                       @DestinationVariable String roomId,
                                       Principal principal) {
 
-        log.info("Received message in room {} from user: {}", roomId, principal.getName());
+        // Временное решение - TODO - исправить после теста!
+     /*   log.info("Received message in room {} from user: {}", roomId, principal.getName());
 
         // Получаем текущего пользователя
         // Get current user
@@ -58,6 +59,25 @@ public class MessageController {
                 roomId,
                 sender,
                 chatMessageDto.getType()
+        );*/
+
+        log.info("Received message in room {} from user: {}", roomId, principal != null ? principal.getName() : "unknown");
+
+        // Временное решение: если principal null, используем тестового пользователя
+        User sender;
+        if (principal == null) {
+            log.warn("Principal is null, using default user 'testuser1234'");
+            sender = chatService.getUserByUsername("testuser1234");
+        } else {
+            sender = chatService.getUserByUsername(principal.getName());
+        }
+
+        // Сохраняем сообщение
+        Message savedMessage = chatService.saveMessage(
+                chatMessageDto.getContent(),
+                roomId,
+                sender,
+                chatMessageDto.getType() != null ? chatMessageDto.getType() : Message.MessageType.TEXT
         );
 
         // Конвертируем в DTO и возвращаем
