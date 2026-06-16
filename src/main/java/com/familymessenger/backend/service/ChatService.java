@@ -43,7 +43,7 @@ public class ChatService {
      * Save message in chat room
      */
     @Transactional
-    public Message saveMessage(String content, String roomId, User sender, Message.MessageType type) {
+    public Message saveMessage(String content, String roomId, User sender, Message.MessageType type, String mediaUrl) {
 
         log.debug("Saving message from {} in room {}", sender.getUsername(), roomId);
 
@@ -62,6 +62,7 @@ public class ChatService {
         message.setChatRoom(chatRoom);
         message.setSender(sender);
         message.setType(type != null ? type : Message.MessageType.TEXT);
+        message.setMediaUrl(mediaUrl);
 
         // Сохраняем в базу данных
         // Save to database

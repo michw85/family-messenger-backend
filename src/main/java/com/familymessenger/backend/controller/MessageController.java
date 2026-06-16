@@ -58,7 +58,8 @@ public class MessageController {
                 chatMessageDto.getContent(),
                 roomId,
                 sender,
-                chatMessageDto.getType()
+               chatMessageDto.getType() != null ? chatMessageDto.getType() : Message.MessageType.TEXT,
+                chatMessageDto.getMediaUrl()
         );*/
 
         log.info("Received message in room {} from user: {}", roomId, principal != null ? principal.getName() : "unknown");
@@ -77,7 +78,8 @@ public class MessageController {
                 chatMessageDto.getContent(),
                 roomId,
                 sender,
-                chatMessageDto.getType() != null ? chatMessageDto.getType() : Message.MessageType.TEXT
+                chatMessageDto.getType() != null ? chatMessageDto.getType() : Message.MessageType.TEXT,
+                chatMessageDto.getMediaUrl()
         );
 
         // Конвертируем в DTO и возвращаем
