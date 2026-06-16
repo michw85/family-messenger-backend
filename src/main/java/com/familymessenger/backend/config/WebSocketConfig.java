@@ -26,9 +26,9 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         // Add /ws endpoint for client connections
         System.out.println("🔌 Registering WebSocket endpoint /ws");
         registry.addEndpoint("/ws")
-                .setAllowedOriginPatterns("*")  // Разрешаем подключения с любых доменов (для разработки)
-                .withSockJS()                   // Включаем SockJS (fallback для браузеров без WebSocket)
-                .setClientLibraryUrl("https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js");
+                .setAllowedOriginPatterns("*");  // Разрешаем подключения с любых доменов (для разработки)
+//                .withSockJS()                   // Включаем SockJS (fallback для браузеров без WebSocket)
+//                .setClientLibraryUrl("https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js");
     }
 
     /**
