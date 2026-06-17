@@ -5,6 +5,7 @@ import com.familymessenger.backend.dto.AuthResponse;
 import com.familymessenger.backend.dto.LoginRequest;
 import com.familymessenger.backend.dto.UserDto;
 import com.familymessenger.backend.entity.User;
+import com.familymessenger.backend.repository.UserRepository;
 import com.familymessenger.backend.security.JwtTokenProvider;
 import com.familymessenger.backend.service.UserService;
 import jakarta.validation.Valid;
@@ -19,6 +20,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
+import java.util.Map;
+
 /**
  * Контроллер для аутентификации и регистрации
  * Controller for authentication and registration
@@ -28,6 +31,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
 public class AuthController {
+    private final UserRepository userRepository;
 
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider tokenProvider;
@@ -149,5 +153,18 @@ public class AuthController {
 
         UserDto userDto = UserDto.fromEntity(user);
         return ResponseEntity.ok(userDto);
+    }
+
+
+    @PostMapping("/fcm-token")
+    public ResponseEntity<?> updateFcmToken(@RequestBody Map<String, String> request,
+                                            @AuthenticationPrincipal User user) {
+        String token = request.get("token");
+        if (token == null || token.isEmpty()) {
+            return ResponseEntity.badRequest().body("Token is empty");
+        }
+        user.setFcmToken(token);
+        userRepository.save(user);
+        return ResponseEntity.ok().build();
     }
 }

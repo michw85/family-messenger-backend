@@ -4,6 +4,7 @@ import com.familymessenger.backend.dto.ChatMessageDto;
 import com.familymessenger.backend.entity.Message;
 import com.familymessenger.backend.entity.User;
 import com.familymessenger.backend.service.ChatService;
+import com.familymessenger.backend.service.FcmService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
@@ -16,6 +17,7 @@ import org.springframework.stereotype.Controller;
 
 import java.security.Principal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -29,6 +31,7 @@ public class MessageController {
 
     private final ChatService chatService;
     private final SimpMessagingTemplate messagingTemplate;
+    private final FcmService fcmService;
 
     /**
      * Отправка сообщения в комнату чата
@@ -61,6 +64,23 @@ public class MessageController {
                chatMessageDto.getType() != null ? chatMessageDto.getType() : Message.MessageType.TEXT,
                 chatMessageDto.getMediaUrl()
         );
+
+        // Отправить уведомления участникам
+        try {
+            List<User> participants = chatService.getParticipants(roomId);
+            for (User recipient : participants) {
+                if (!recipient.getId().equals(sender.getId()) && recipient.getFcmToken() != null && !recipient.getFcmToken().isEmpty()) {
+                    fcmService.sendPushNotification(
+                            recipient.getFcmToken(),
+                            "Новое сообщение от " + sender.getUsername(),
+                            chatMessageDto.getContent()
+                    );
+                }
+            }
+        } catch (Exception e) {
+            log.error("Failed to send push notifications", e);
+            // Не прерываем выполнение
+        }
 
         // Конвертируем в DTO и возвращаем
         // Convert to DTO and return

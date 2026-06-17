@@ -181,4 +181,10 @@ public class ChatService {
         chatRoomRepository.delete(chatRoom);
         log.info("Chat deleted: {}", chatId);
     }
+
+    public List<User> getParticipants(String chatRoomId) {
+        ChatRoom chatRoom = chatRoomRepository.findById(chatRoomId)
+                .orElseThrow(() -> new RuntimeException("Chat room not found"));
+        return chatRoom.getParticipants();
+    }
 }
