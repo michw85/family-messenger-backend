@@ -36,7 +36,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         // Пропускаем WebSocket запросы без проверки
         String path = request.getRequestURI();
         log.info("Request path: {}", path);
-        if (path.startsWith("/api/auth") || path.startsWith("/ws") || path.contains("sockjs")) {
+        if ((path.startsWith("/api/auth") && !path.equals("/api/auth/fcm-token") && !path.equals("/api/auth/me"))
+                || path.startsWith("/ws") || path.contains("sockjs")) {
             log.info("Skipping JWT filter for public path: {}", path);
             filterChain.doFilter(request, response);
             return;

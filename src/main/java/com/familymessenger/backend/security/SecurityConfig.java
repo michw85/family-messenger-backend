@@ -51,13 +51,16 @@ public class SecurityConfig {
                 )
                 .authorizeHttpRequests(auth -> auth
                         // Открытые эндпоинты (без авторизации) / Public endpoints (no auth required)
-                        .requestMatchers("/api/auth/**", "/ws/**", "/ws").permitAll()
+                        .requestMatchers("/api/auth/login", "/api/auth/register").permitAll()
+                        .requestMatchers("/ws/**", "/ws").permitAll()
                         // Swagger UI (если добавим позже) / Swagger UI (if added later)
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         // Файлы - скачивание / Files - download
                         .requestMatchers("/api/files/download/**").permitAll()
                         // База данных - H2 консоль / Database - H2 console
                         .requestMatchers("/h2-console/**").permitAll()
+                        // /auth/fcm-token не должен быть публичным эндпоинтом — ему нужна авторизация, чтобы знать, чей токен обновлять / It shouldn't be a public endpoint—it requires authorization to know whose token to refresh
+                        .requestMatchers("/api/auth/fcm-token", "/api/auth/me").authenticated()
                         // Все остальные запросы требуют авторизации / All other requests require authentication
                         .anyRequest().authenticated()
                 )
