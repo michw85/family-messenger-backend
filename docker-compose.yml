@@ -50,7 +50,7 @@ services:
       - "8080:8080"
     environment:
       - SPRING_PROFILES_ACTIVE=docker
-      - JWT_SECRET=${JWT_SECRET:-yourSuperSecretKeyForProductionChangeItNow}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
     depends_on:
       - postgres
       - redis
@@ -67,3 +67,4 @@ volumes:
 networks:
   messenger-network:
     driver: bridge
+
