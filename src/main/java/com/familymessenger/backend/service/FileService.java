@@ -85,8 +85,8 @@ public class FileService {
         // Формируем URL для доступа к файлу
         // Build URL for file access
 //        String fileUrl = String.format("%s/%s/%s", minioUrl, bucketName, filename);
-        String fileUrl = String.format("http://165.245.213.90:9000/%s/%s", bucketName, filename);
-
+//        String fileUrl = String.format("http://165.245.213.90:9000/%s/%s", bucketName, filename);
+        String fileUrl = String.format("https://bonds-app.duckdns.org/media/%s", filename);
         log.info("File uploaded successfully: {}", fileUrl);
 
         return fileUrl;
