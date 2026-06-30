@@ -9,6 +9,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 /**
  * Сервис для работы с пользователями
  * Service for user operations
@@ -106,5 +108,19 @@ public class UserService {
                     log.error("User not found with id: {}", id);
                     return new RuntimeException("User not found with id: " + id);
                 });
+    }
+
+    /**
+     * Поиск пользователей по имени или email (исключая текущего)
+     * Search users by username or email (excluding current user)
+     * @param query - поисковый запрос / search query
+     * @param currentUserId - ID текущего пользователя / current user ID
+     * @return список пользователей / list of users
+     */
+    public List<User> searchUsers(String query, Long currentUserId) {
+        if (query == null || query.trim().isEmpty()) {
+            return List.of(); // пустой список, если запрос пуст / empty list if query is empty
+        }
+        return userRepository.searchUsers(query, currentUserId);
     }
 }

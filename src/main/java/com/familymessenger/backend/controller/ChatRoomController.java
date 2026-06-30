@@ -1,8 +1,6 @@
 package com.familymessenger.backend.controller;
 
-import com.familymessenger.backend.dto.ChatRoomDto;
-import com.familymessenger.backend.dto.ChatMessageDto;
-import com.familymessenger.backend.dto.CreateChatRequest;
+import com.familymessenger.backend.dto.*;
 import com.familymessenger.backend.entity.ChatRoom;
 import com.familymessenger.backend.entity.Message;
 import com.familymessenger.backend.entity.User;
@@ -89,5 +87,90 @@ public class ChatRoomController {
 
         chatService.deleteChat(chatId, user.getId());
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Получить участников чата
+     * Get chat participants
+     *
+     * @param chatId - ID чата / chat ID
+     * @param user - текущий пользователь / current user
+     * @return список участников / list of participants
+     */
+    @GetMapping("/{chatId}/participants")
+    public ResponseEntity<List<UserDto>> getParticipants(@PathVariable String chatId,
+                                                         @AuthenticationPrincipal User user) {
+        log.info("Fetching participants for chat: {} by user: {}", chatId, user.getUsername());
+
+        List<User> participants = chatService.getParticipants(chatId);
+        List<UserDto> dtos = participants.stream()
+                .map(UserDto::fromEntity)
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(dtos);
+    }
+
+    /**
+     * Добавить участников в чат
+     * Add participants to chat
+     *
+     * @param chatId - ID чата / chat ID
+     * @param request - список ID пользователей / list of user IDs
+     * @param user - текущий пользователь / current user
+     * @return обновлённый список участников / updated list of participants
+     */
+    @PostMapping("/{chatId}/participants")
+    public ResponseEntity<List<UserDto>> addParticipants(@PathVariable String chatId,
+                                                         @RequestBody List<Long> userIds,
+                                                         @AuthenticationPrincipal User user) {
+        log.info("Adding participants to chat: {} by user: {}", chatId, user.getUsername());
+
+        List<User> updatedParticipants = chatService.addParticipants(chatId, userIds, user.getId());
+        List<UserDto> dtos = updatedParticipants.stream()
+                .map(UserDto::fromEntity)
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(dtos);
+    }
+
+    /**
+     * Удалить участника из чата
+     * Remove participant from chat
+     *
+     * @param chatId - ID чата / chat ID
+     * @param userId - ID пользователя для удаления / user ID to remove
+     * @param user - текущий пользователь / current user
+     */
+    @DeleteMapping("/{chatId}/participants/{userId}")
+    public ResponseEntity<?> removeParticipant(@PathVariable String chatId,
+                                               @PathVariable Long userId,
+                                               @AuthenticationPrincipal User user) {
+        log.info("Removing participant {} from chat: {} by user: {}", userId, chatId, user.getUsername());
+
+        chatService.removeParticipant(chatId, userId, user.getId());
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Создать групповой чат с участниками
+     * Create group chat with participants
+     *
+     * @param request - запрос с названием и участниками / request with name and participants
+     * @param user - текущий пользователь / current user
+     * @return созданный чат / created chat
+     */
+    @PostMapping("/group")
+    public ResponseEntity<ChatRoomDto> createGroupChat(@Valid @RequestBody CreateGroupChatRequest request,
+                                                       @AuthenticationPrincipal User user) {
+        log.info("Creating group chat '{}' by user: {} with {} participants",
+                request.getName(), user.getUsername(), request.getParticipantIds().size());
+
+        ChatRoom chat = chatService.createGroupChat(
+                request.getName(),
+                user.getId(),
+                request.getParticipantIds()
+        );
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(ChatRoomDto.fromEntity(chat));
     }
 }

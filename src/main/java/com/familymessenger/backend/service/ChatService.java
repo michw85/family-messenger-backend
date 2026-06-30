@@ -187,4 +187,95 @@ public class ChatService {
                 .orElseThrow(() -> new RuntimeException("Chat room not found"));
         return chatRoom.getParticipants();
     }
+
+    /**
+     * Добавить участников в чат
+     * Add participants to chat
+     * @param chatId - ID чата / chat ID
+     * @param userIds - ID пользователей для добавления / user IDs to add
+     * @param currentUserId - ID текущего пользователя / current user ID
+     * @return обновлённый список участников / updated list of participants
+     */
+    @Transactional
+    public List<User> addParticipants(String chatId, List<Long> userIds, Long currentUserId) {
+        ChatRoom chatRoom = chatRoomRepository.findById(chatId)
+                .orElseThrow(() -> new RuntimeException("Chat room not found"));
+
+        // Проверяем, что текущий пользователь является участником / Check current user is participant
+        boolean isParticipant = chatRoom.getParticipants().stream()
+                .anyMatch(u -> u.getId().equals(currentUserId));
+        if (!isParticipant) {
+            throw new RuntimeException("Only participants can add others");
+        }
+
+        // Загружаем пользователей для добавления / Load users to add
+        List<User> usersToAdd = userRepository.findAllById(userIds);
+        for (User user : usersToAdd) {
+            if (!chatRoom.getParticipants().contains(user)) {
+                chatRoom.getParticipants().add(user);
+            }
+        }
+
+        chatRoomRepository.save(chatRoom);
+        return chatRoom.getParticipants();
+    }
+
+    /**
+     * Удалить участника из чата
+     * Remove participant from chat
+     * @param chatId - ID чата / chat ID
+     * @param userId - ID пользователя для удаления / user ID to remove
+     * @param currentUserId - ID текущего пользователя / current user ID
+     */
+    @Transactional
+    public void removeParticipant(String chatId, Long userId, Long currentUserId) {
+        ChatRoom chatRoom = chatRoomRepository.findById(chatId)
+                .orElseThrow(() -> new RuntimeException("Chat room not found"));
+
+        // Только создатель или сам участник может удалить / Only creator or the participant can remove
+        boolean isCreator = chatRoom.getCreatedBy().getId().equals(currentUserId);
+        boolean isSelf = userId.equals(currentUserId);
+
+        if (!isCreator && !isSelf) {
+            throw new RuntimeException("Only creator or the participant can remove themself");
+        }
+
+        User userToRemove = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        chatRoom.getParticipants().remove(userToRemove);
+        chatRoomRepository.save(chatRoom);
+    }
+
+    /**
+     * Создать групповой чат с участниками
+     * Create group chat with participants
+     * @param name - название чата / chat name
+     * @param creatorId - ID создателя / creator ID
+     * @param participantIds - ID участников / participant IDs
+     * @return созданный чат / created chat
+     */
+    @Transactional
+    public ChatRoom createGroupChat(String name, Long creatorId, List<Long> participantIds) {
+        User creator = userRepository.findById(creatorId)
+                .orElseThrow(() -> new RuntimeException("Creator not found"));
+
+        ChatRoom chatRoom = new ChatRoom();
+        chatRoom.setName(name);
+        chatRoom.setType(ChatRoom.RoomType.GROUP);
+        chatRoom.setCreatedBy(creator);
+        chatRoom.getParticipants().add(creator);
+
+        // Добавляем участников / Add participants
+        if (participantIds != null && !participantIds.isEmpty()) {
+            List<User> participants = userRepository.findAllById(participantIds);
+            for (User user : participants) {
+                if (!chatRoom.getParticipants().contains(user)) {
+                    chatRoom.getParticipants().add(user);
+                }
+            }
+        }
+
+        return chatRoomRepository.save(chatRoom);
+    }
 }
