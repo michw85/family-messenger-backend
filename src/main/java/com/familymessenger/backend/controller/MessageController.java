@@ -66,7 +66,7 @@ public class MessageController {
         );
 
         // Отправить уведомления участникам
-        try {
+        /*try {
             List<User> participants = chatService.getParticipants(roomId);
             for (User recipient : participants) {
                 if (!recipient.getId().equals(sender.getId()) && recipient.getFcmToken() != null && !recipient.getFcmToken().isEmpty()) {
@@ -76,6 +76,15 @@ public class MessageController {
                             chatMessageDto.getContent()
                     );
                 }
+            }*/
+        try {
+            List<String> tokens = chatService.getParticipantFcmTokens(roomId, sender.getId());
+            for (String token : tokens) {
+                fcmService.sendPushNotification(
+                        token,
+                        "Новое сообщение от " + sender.getUsername(),
+                        chatMessageDto.getContent()
+                );
             }
         } catch (Exception e) {
             log.error("Failed to send push notifications", e);

@@ -278,4 +278,16 @@ public class ChatService {
 
         return chatRoomRepository.save(chatRoom);
     }
+
+
+    @Transactional(readOnly = true)
+    public List<String> getParticipantFcmTokens(String chatRoomId, Long excludeUserId) {
+        ChatRoom chatRoom = chatRoomRepository.findById(chatRoomId)
+                .orElseThrow(() -> new RuntimeException("Chat room not found"));
+        return chatRoom.getParticipants().stream()
+                .filter(u -> !u.getId().equals(excludeUserId))
+                .map(User::getFcmToken)
+                .filter(token -> token != null && !token.isEmpty())
+                .collect(java.util.stream.Collectors.toList());
+    }
 }
