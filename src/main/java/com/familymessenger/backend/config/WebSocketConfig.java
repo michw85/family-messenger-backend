@@ -46,7 +46,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     public void configureMessageBroker(MessageBrokerRegistry config) {
         // Префикс для топиков (куда клиенты подписываются для получения сообщений)
         // Topic prefix (where clients subscribe to receive messages)
-        config.enableSimpleBroker("/topic", "/queue")
+        config.enableSimpleBroker("/topic", "/queue");
 
         // Префикс для отправки сообщений от клиента (куда клиенты отправляют)
         // App prefix (where clients send messages)
