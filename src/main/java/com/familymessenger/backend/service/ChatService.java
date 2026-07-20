@@ -280,6 +280,32 @@ public class ChatService {
     }
 
 
+    /**
+     * Проверка, является ли пользователь участником чата
+     * Check whether the user is a participant of the chat room
+     */
+    @Transactional(readOnly = true)
+    public boolean isParticipant(String chatRoomId, Long userId) {
+        ChatRoom chatRoom = chatRoomRepository.findById(chatRoomId)
+                .orElseThrow(() -> new RuntimeException("Chat room not found"));
+        return chatRoom.getParticipants().stream()
+                .anyMatch(p -> p.getId().equals(userId));
+    }
+
+    /**
+     * Проверка, имеет ли пользователь доступ к медиафайлу
+     * (файл должен принадлежать сообщению в чате, где пользователь — участник)
+     * Check if user has access to a media file (file must belong to a message
+     * in a chat room where the user is a participant)
+     */
+    @Transactional(readOnly = true)
+    public boolean canAccessMediaFile(String filename, Long userId) {
+        return messageRepository.findFirstByMediaUrlEndingWith(filename)
+                .map(m -> m.getChatRoom().getParticipants().stream()
+                        .anyMatch(p -> p.getId().equals(userId)))
+                .orElse(false);
+    }
+
     @Transactional(readOnly = true)
     public List<String> getParticipantFcmTokens(String chatRoomId, Long excludeUserId) {
         ChatRoom chatRoom = chatRoomRepository.findById(chatRoomId)

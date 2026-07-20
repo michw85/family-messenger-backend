@@ -7,6 +7,10 @@ import com.familymessenger.backend.dto.UserDto;
 import com.familymessenger.backend.entity.User;
 import com.familymessenger.backend.repository.UserRepository;
 import com.familymessenger.backend.security.JwtTokenProvider;
+import com.familymessenger.backend.security.LoginAttemptService;
+import com.familymessenger.backend.security.OtpService;
+import com.familymessenger.backend.security.RefreshTokenService;
+import com.familymessenger.backend.service.EmailService;
 import com.familymessenger.backend.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -15,8 +19,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
@@ -36,6 +38,10 @@ public class AuthController {
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider tokenProvider;
     private final UserService userService;
+    private final LoginAttemptService loginAttemptService;
+    private final RefreshTokenService refreshTokenService;
+    private final OtpService otpService;
+    private final EmailService emailService;
 
     /**
      * Регистрация нового пользователя
@@ -71,9 +77,10 @@ public class AuthController {
         // Create new user
         User user = userService.registerNewUser(request);
 
-        // Генерируем JWT токен
-        // Generate JWT token
+        // Генерируем JWT токен и refresh-токен
+        // Generate JWT access token and refresh token
         String jwt = tokenProvider.generateToken(user.getUsername());
+        String refreshToken = refreshTokenService.issueRefreshToken(user);
 
         // Конвертируем User в UserDto (чтобы не отправлять пароль)
         // Convert User to UserDto (to avoid sending password)
@@ -85,56 +92,102 @@ public class AuthController {
         // Return token and user data
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(new AuthResponse(jwt, userDto));
+                .body(new AuthResponse(jwt, refreshToken, userDto));
     }
 
     /**
-     * Логин пользователя
-     * User login
+     * Шаг 1 логина: проверка пароля и отправка одноразового кода на email (2FA)
+     * Login step 1: verify password and send a one-time code to email (2FA)
      *
      * @param request - данные для входа (username, password) / login data
-     * @return токен и данные пользователя / token and user data
+     * @return признак того, что нужно ввести код из письма / indicates a code from email is required
      */
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
 
         log.info("Login attempt for username: {}", request.getUsername());
 
+        if (loginAttemptService.isBlocked(request.getUsername())) {
+            log.warn("Blocked login attempt (too many failures) for username: {}", request.getUsername());
+            return ResponseEntity
+                    .status(HttpStatus.TOO_MANY_REQUESTS)
+                    .body("Too many failed login attempts. Try again later / Слишком много неудачных попыток входа. Попробуйте позже");
+        }
+
         try {
             // Аутентифицируем пользователя (проверяем username и password)
             // Authenticate user (check username and password)
-            Authentication authentication = authenticationManager.authenticate(
+            authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(
                             request.getUsername(),
                             request.getPassword()
                     )
             );
 
-            // Устанавливаем аутентификацию в контекст Spring Security
-            // Set authentication in Spring Security context
-            SecurityContextHolder.getContext().setAuthentication(authentication);
-
-            // Генерируем JWT токен
-            // Generate JWT token
-            String jwt = tokenProvider.generateToken(request.getUsername());
-
-            // Загружаем данные пользователя из БД
-            // Load user data from database
             User user = userService.findByUsername(request.getUsername());
-            UserDto userDto = UserDto.fromEntity(user);
 
-            log.info("User logged in successfully: {}", request.getUsername());
+            // Пароль верный - генерируем и отправляем одноразовый код на email
+            // Password is correct - generate and send a one-time code to email
+            String code = otpService.generateAndStore(user.getUsername());
+            emailService.sendOtpEmail(user.getEmail(), code);
 
-            // Возвращаем токен и данные пользователя
-            // Return token and user data
-            return ResponseEntity.ok(new AuthResponse(jwt, userDto));
+            log.info("OTP sent for username: {}", request.getUsername());
+
+            return ResponseEntity.ok(Map.of(
+                    "otpRequired", true,
+                    "message", "Verification code sent to email / Код подтверждения отправлен на email"
+            ));
 
         } catch (Exception e) {
+            loginAttemptService.recordFailedAttempt(request.getUsername());
             log.error("Login failed for user: {}", request.getUsername(), e);
             return ResponseEntity
                     .status(HttpStatus.UNAUTHORIZED)
                     .body("Invalid username or password / Неверное имя пользователя или пароль");
         }
+    }
+
+    /**
+     * Шаг 2 логина: проверка кода из email и выдача токенов
+     * Login step 2: verify the email code and issue tokens
+     *
+     * @param request - тело запроса с полями username и code / request body with username and code fields
+     * @return токен и данные пользователя / token and user data
+     */
+    @PostMapping("/login/verify-otp")
+    public ResponseEntity<?> verifyLoginOtp(@RequestBody Map<String, String> request) {
+        String username = request.get("username");
+        String code = request.get("code");
+
+        if (username == null || code == null) {
+            return ResponseEntity.badRequest().body("username and code are required / username и code обязательны");
+        }
+
+        if (loginAttemptService.isBlocked(username)) {
+            return ResponseEntity
+                    .status(HttpStatus.TOO_MANY_REQUESTS)
+                    .body("Too many failed attempts. Try again later / Слишком много неудачных попыток. Попробуйте позже");
+        }
+
+        if (!otpService.verify(username, code)) {
+            loginAttemptService.recordFailedAttempt(username);
+            log.warn("Invalid OTP for username: {}", username);
+            return ResponseEntity
+                    .status(HttpStatus.UNAUTHORIZED)
+                    .body("Invalid or expired code / Неверный или истёкший код");
+        }
+
+        loginAttemptService.resetAttempts(username);
+
+        User user = userService.findByUsername(username);
+
+        String jwt = tokenProvider.generateToken(user.getUsername());
+        String refreshToken = refreshTokenService.issueRefreshToken(user);
+        UserDto userDto = UserDto.fromEntity(user);
+
+        log.info("User logged in successfully (OTP verified): {}", username);
+
+        return ResponseEntity.ok(new AuthResponse(jwt, refreshToken, userDto));
     }
 
     /**
@@ -155,6 +208,48 @@ public class AuthController {
         return ResponseEntity.ok(userDto);
     }
 
+
+    /**
+     * Обновление access-токена по refresh-токену (без пароля)
+     * Refresh the access token using a refresh token (no password needed)
+     *
+     * @param request - тело запроса с полем refreshToken / request body with refreshToken field
+     * @return новый access-токен и новый refresh-токен (ротация) / new access token and new refresh token (rotation)
+     */
+    @PostMapping("/refresh")
+    public ResponseEntity<?> refresh(@RequestBody Map<String, String> request) {
+        String oldRefreshToken = request.get("refreshToken");
+        if (oldRefreshToken == null || oldRefreshToken.isBlank()) {
+            return ResponseEntity.badRequest().body("refreshToken is required / refreshToken обязателен");
+        }
+
+        try {
+            User user = refreshTokenService.validateAndConsume(oldRefreshToken);
+
+            String newAccessToken = tokenProvider.generateToken(user.getUsername());
+            String newRefreshToken = refreshTokenService.issueRefreshToken(user);
+
+            return ResponseEntity.ok(new AuthResponse(newAccessToken, newRefreshToken, UserDto.fromEntity(user)));
+        } catch (Exception e) {
+            log.warn("Refresh token rejected: {}", e.getMessage());
+            return ResponseEntity
+                    .status(HttpStatus.UNAUTHORIZED)
+                    .body("Invalid or expired refresh token / Недействительный или истёкший refresh-токен");
+        }
+    }
+
+    /**
+     * Выход из аккаунта — отзыв refresh-токена
+     * Logout — revoke the refresh token
+     */
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(@RequestBody(required = false) Map<String, String> request) {
+        String refreshToken = request != null ? request.get("refreshToken") : null;
+        if (refreshToken != null && !refreshToken.isBlank()) {
+            refreshTokenService.revoke(refreshToken);
+        }
+        return ResponseEntity.ok().build();
+    }
 
     @PostMapping("/fcm-token")
     public ResponseEntity<?> updateFcmToken(@RequestBody Map<String, String> request,

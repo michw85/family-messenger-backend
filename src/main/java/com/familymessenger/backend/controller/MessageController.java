@@ -29,9 +29,32 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class MessageController {
 
+    private static final int MAX_MESSAGE_LENGTH = 4000;
+
     private final ChatService chatService;
     private final SimpMessagingTemplate messagingTemplate;
     private final FcmService fcmService;
+
+    /**
+     * Базовая проверка и очистка текста сообщения: ограничение длины и
+     * удаление управляющих символов (защита от переполнения и мусора,
+     * который может быть использован для инъекций в будущих веб-клиентах)
+     * Basic message content validation and sanitization: length cap and
+     * stripping of control characters (guards against overflow and payloads
+     * that could be abused for injection in future web-based clients)
+     */
+    private String sanitizeContent(String content) {
+        if (content == null) {
+            return null;
+        }
+        String trimmed = content.strip();
+        if (trimmed.length() > MAX_MESSAGE_LENGTH) {
+            throw new IllegalArgumentException("Message content exceeds maximum length");
+        }
+        // Убираем управляющие символы, кроме перевода строки и табуляции
+        // Strip control characters except newline and tab
+        return trimmed.replaceAll("[\\p{Cntrl}&&[^\n\t]]", "");
+    }
 
     /**
      * Отправка сообщения в комнату чата
@@ -55,10 +78,19 @@ public class MessageController {
         // Get current user
         User sender = chatService.getUserByUsername(principal.getName());
 
+        // Проверяем, что отправитель — участник комнаты (иначе нельзя писать/подслушивать чужой чат)
+        // Verify sender is a participant of the room (otherwise they could write into/eavesdrop on someone else's chat)
+        if (!chatService.isParticipant(roomId, sender.getId())) {
+            log.warn("User {} tried to send a message to room {} without being a participant", sender.getUsername(), roomId);
+            throw new IllegalStateException("Not a participant of this chat room");
+        }
+
+        String content = sanitizeContent(chatMessageDto.getContent());
+
         // Сохраняем сообщение в базу данных
         // Save message to database
         Message savedMessage = chatService.saveMessage(
-                chatMessageDto.getContent(),
+                content,
                 roomId,
                 sender,
                chatMessageDto.getType() != null ? chatMessageDto.getType() : Message.MessageType.TEXT,
@@ -83,7 +115,7 @@ public class MessageController {
                 fcmService.sendPushNotification(
                         token,
                         "Новое сообщение от " + sender.getUsername(),
-                        chatMessageDto.getContent()
+                        content
                 );
             }
         } catch (Exception e) {
@@ -115,7 +147,7 @@ public class MessageController {
         // Сохраняем личное сообщение
         // Save private message
         Message savedMessage = chatService.savePrivateMessage(
-                chatMessageDto.getContent(),
+                sanitizeContent(chatMessageDto.getContent()),
                 chatMessageDto.getChatRoomId(),
                 sender
         );

@@ -9,9 +9,12 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface MessageRepository extends JpaRepository<Message, String> {
+
+    Optional<Message> findFirstByMediaUrlEndingWith(String suffix);
 
     List<Message> findByChatRoomOrderByTimestampAsc(ChatRoom chatRoom);
 

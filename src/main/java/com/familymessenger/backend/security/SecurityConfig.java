@@ -1,6 +1,7 @@
 package com.familymessenger.backend.security;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -29,6 +30,9 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
+    @Value("${app.cors.allowed-origins}")
+    private String allowedOrigins;
+
     /**
      * Настройка цепочки фильтров безопасности
      * Security filter chain configuration
@@ -51,12 +55,14 @@ public class SecurityConfig {
                 )
                 .authorizeHttpRequests(auth -> auth
                         // Открытые эндпоинты (без авторизации) / Public endpoints (no auth required)
-                        .requestMatchers("/api/auth/login", "/api/auth/register").permitAll()
+                        // refresh/logout работают по refresh-токену в теле запроса, а не по JWT,
+                        // поэтому не требуют действующего access-токена
+                        // refresh/logout authenticate via the refresh token in the request body,
+                        // not the JWT, so they don't require a valid access token
+                        .requestMatchers("/api/auth/login", "/api/auth/login/verify-otp", "/api/auth/register", "/api/auth/refresh", "/api/auth/logout").permitAll()
                         .requestMatchers("/ws/**", "/ws").permitAll()
                         // Swagger UI (если добавим позже) / Swagger UI (if added later)
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
-                        // Файлы - скачивание / Files - download
-                        .requestMatchers("/api/files/download/**").permitAll()
                         // База данных - H2 консоль / Database - H2 console
                         .requestMatchers("/h2-console/**").permitAll()
                         // /auth/fcm-token не должен быть публичным эндпоинтом — ему нужна авторизация, чтобы знать, чей токен обновлять / It shouldn't be a public endpoint—it requires authorization to know whose token to refresh
@@ -90,11 +96,17 @@ public class SecurityConfig {
     }
 
     /**
-     * Настройка CORS (Cross-Origin Resource Sharing) для разрешения запросов с мобильного приложения
-     * CORS (Cross-Origin Resource Sharing) configuration to allow requests from mobile app
+     * Настройка CORS (Cross-Origin Resource Sharing)
+     * CORS (Cross-Origin Resource Sharing) configuration
      *
-     * Разрешаем запросы с любых источников (для разработки, позже ограничим доменом)
-     * Allow requests from any origin (for development, later restrict to specific domain)
+     * Нативное мобильное приложение не отправляет заголовок Origin, поэтому CORS
+     * здесь в первую очередь защищает от браузерных/веб-клиентов с чужих доменов.
+     * "*" вместе с allowCredentials(true) недопустим (Spring это отклоняет) и просто
+     * небезопасен, поэтому ограничиваем списком доверенных доменов из конфигурации.
+     * A native mobile app doesn't send an Origin header, so CORS here mainly guards
+     * against browser/web clients from other domains. "*" combined with
+     * allowCredentials(true) is rejected by Spring and unsafe anyway, so we restrict
+     * to a configured allow-list of trusted domains instead.
      *
      * @return источник CORS конфигурации / CORS configuration source
      */
@@ -102,9 +114,9 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // Разрешаем запросы с любых источников (для разработки с мобильных устройств)
-        // Allow requests from any origin (for mobile development)
-        configuration.setAllowedOrigins(Arrays.asList("*"));
+        // Список доверенных доменов из application.properties (app.cors.allowed-origins)
+        // Allow-list of trusted domains from application.properties (app.cors.allowed-origins)
+        configuration.setAllowedOrigins(Arrays.asList(allowedOrigins.split(",")));
 
         // Разрешаем HTTP методы, которые использует приложение
         // Allow HTTP methods used by the application

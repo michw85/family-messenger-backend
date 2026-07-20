@@ -38,3 +38,7 @@ out/
 
 *.json
 !application*.properties
+
+# Секреты окружения - никогда не коммитить
+# Environment secrets - never commit
+.env

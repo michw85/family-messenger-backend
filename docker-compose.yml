@@ -51,6 +51,9 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
+      - MAIL_USERNAME=${MAIL_USERNAME:?MAIL_USERNAME is required for email 2FA}
+      - MAIL_PASSWORD=${MAIL_PASSWORD:?MAIL_PASSWORD is required for email 2FA}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-https://bonds-app.duckdns.org}
     depends_on:
       - postgres
       - redis

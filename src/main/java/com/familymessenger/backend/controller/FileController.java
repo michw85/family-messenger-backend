@@ -1,5 +1,6 @@
 package com.familymessenger.backend.controller;
 
+import com.familymessenger.backend.service.ChatService;
 import com.familymessenger.backend.service.FileService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +24,7 @@ import java.util.Map;
 public class FileController {
 
     private final FileService fileService;
+    private final ChatService chatService;
 
     /**
      * Загрузка изображения
@@ -125,16 +127,34 @@ public class FileController {
     }
 
     /**
-     * Получение файла (для доступа к загруженным файлам)
-     * Get file (for accessing uploaded files)
+     * Получение файла (для доступа к загруженным файлам).
+     * Доступ разрешён только участникам чата, к которому относится файл.
+     * Get file (for accessing uploaded files).
+     * Access is only allowed to participants of the chat the file belongs to.
      *
-     * @param filename - имя файла / filename
+     * @param filename - имя файла (может включать папку, напр. images/xxx.jpg) / filename (may include folder)
+     * @param user - текущий авторизованный пользователь / current authenticated user
      * @return файл / file
      */
-    @GetMapping("/download/{filename}")
-    public ResponseEntity<?> downloadFile(@PathVariable String filename) {
+    @GetMapping("/download/{*filename}")
+    public ResponseEntity<?> downloadFile(@PathVariable String filename,
+                                          @AuthenticationPrincipal User user) {
 
-        log.info("Downloading file: {}", filename);
+        if (filename.startsWith("/")) {
+            filename = filename.substring(1);
+        }
+
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        if (!chatService.canAccessMediaFile(filename, user.getId())) {
+            log.warn("User {} denied access to file: {}", user.getUsername(), filename);
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("You do not have access to this file / Нет доступа к этому файлу");
+        }
+
+        log.info("Downloading file: {} by user: {}", filename, user.getUsername());
 
         try {
             byte[] fileData = fileService.downloadFile(filename);

@@ -13,7 +13,8 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class AuthResponse {
 
-    private String token;       // JWT токен для авторизации / JWT token for authorization
+    private String token;        // JWT (access) токен для авторизации / JWT access token for authorization
+    private String refreshToken; // Токен для обновления access-токена / Token used to obtain a new access token
     private String type = "Bearer";  // Тип токена (всегда Bearer) / Token type (always Bearer)
     private UserDto user;       // Данные пользователя / User data
 
@@ -26,6 +27,12 @@ public class AuthResponse {
      */
     public AuthResponse(String token, UserDto user) {
         this.token = token;
+        this.user = user;
+    }
+
+    public AuthResponse(String token, String refreshToken, UserDto user) {
+        this.token = token;
+        this.refreshToken = refreshToken;
         this.user = user;
     }
 }

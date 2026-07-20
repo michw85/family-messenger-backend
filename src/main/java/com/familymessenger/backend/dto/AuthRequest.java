@@ -2,6 +2,7 @@ package com.familymessenger.backend.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
@@ -20,6 +21,10 @@ public class AuthRequest {
     private String email;
 
     @NotBlank(message = "Password is required / Пароль обязателен")
-    @Size(min = 6, message = "Password must be at least 6 characters / Пароль должен быть минимум 6 символов")
+    @Size(min = 8, max = 100, message = "Password must be at least 8 characters / Пароль должен быть минимум 8 символов")
+    @Pattern(
+            regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).+$",
+            message = "Password must contain an uppercase letter, a lowercase letter and a digit / Пароль должен содержать заглавную и строчную буквы, а также цифру"
+    )
     private String password;
 }
