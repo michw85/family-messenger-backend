@@ -18,6 +18,8 @@ public interface MessageRepository extends JpaRepository<Message, String> {
 
     List<Message> findByChatRoomOrderByTimestampAsc(ChatRoom chatRoom);
 
+    List<Message> findByChatRoomAndContentContainingIgnoreCaseOrderByTimestampDesc(ChatRoom chatRoom, String content);
+
     List<Message> findByChatRoomOrderByTimestampDesc(ChatRoom chatRoom, Pageable pageable);
 
     @Query("SELECT m FROM Message m WHERE m.chatRoom = :chatRoom AND m.timestamp > :since ORDER BY m.timestamp ASC")

@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
 import java.util.List;
 
 /**
@@ -125,15 +126,29 @@ public class ChatService {
     }
 
     /**
-     * Получение истории сообщений в комнате
-     * Get message history in room
+     * Получение истории сообщений в комнате постранично (страница 0 - самые
+     * новые сообщения, дальше - всё более старые)
+     * Get message history in room, paginated (page 0 - the newest messages,
+     * higher pages - progressively older ones)
      */
-    public List<Message> getMessageHistory(String roomId, int limit) {
+    public List<Message> getMessageHistory(String roomId, int page, int size) {
 
         ChatRoom chatRoom = chatRoomRepository.findById(roomId)
                 .orElseThrow(() -> new RuntimeException("Chat room not found"));
 
-        return messageRepository.findByChatRoomOrderByTimestampDesc(chatRoom, Pageable.ofSize(limit));
+        return messageRepository.findByChatRoomOrderByTimestampDesc(chatRoom, PageRequest.of(page, size));
+    }
+
+    /**
+     * Поиск по тексту сообщений внутри чата (без учёта регистра)
+     * Search message content within a chat (case-insensitive)
+     */
+    @Transactional(readOnly = true)
+    public List<Message> searchMessages(String roomId, String query) {
+        ChatRoom chatRoom = chatRoomRepository.findById(roomId)
+                .orElseThrow(() -> new RuntimeException("Chat room not found"));
+
+        return messageRepository.findByChatRoomAndContentContainingIgnoreCaseOrderByTimestampDesc(chatRoom, query);
     }
 
     /**
@@ -279,6 +294,46 @@ public class ChatService {
         return chatRoomRepository.save(chatRoom);
     }
 
+
+    /**
+     * Редактирование собственного сообщения
+     * Editing your own message
+     */
+    @Transactional
+    public Message editMessage(String messageId, String newContent, Long userId) {
+        Message message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new RuntimeException("Message not found"));
+
+        if (!message.getSender().getId().equals(userId)) {
+            throw new RuntimeException("Only the sender can edit this message");
+        }
+        if (message.isDeleted()) {
+            throw new RuntimeException("Cannot edit a deleted message");
+        }
+
+        message.setContent(newContent);
+        message.setEdited(true);
+        return messageRepository.save(message);
+    }
+
+    /**
+     * Удаление собственного сообщения (мягкое - оставляет плейсхолдер)
+     * Deleting your own message (soft delete - leaves a placeholder)
+     */
+    @Transactional
+    public Message deleteMessage(String messageId, Long userId) {
+        Message message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new RuntimeException("Message not found"));
+
+        if (!message.getSender().getId().equals(userId)) {
+            throw new RuntimeException("Only the sender can delete this message");
+        }
+
+        message.setDeleted(true);
+        message.setContent(null);
+        message.setMediaUrl(null);
+        return messageRepository.save(message);
+    }
 
     /**
      * Проверка, является ли пользователь участником чата

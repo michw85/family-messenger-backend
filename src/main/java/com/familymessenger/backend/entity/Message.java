@@ -35,6 +35,12 @@ public class Message {
 
     private LocalDateTime timestamp;
 
+    @Column(nullable = false)
+    private boolean edited = false;
+
+    @Column(nullable = false)
+    private boolean deleted = false;
+
     @PrePersist
     protected void onCreate() {
         timestamp = LocalDateTime.now();

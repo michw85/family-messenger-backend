@@ -24,6 +24,8 @@ public class ChatMessageDto {
     private Message.MessageType type; // Тип сообщения (TEXT, IMAGE, VOICE) / Message type
     private String mediaUrl;        // Ссылка на файл (фото/голос) / Media file URL
     private LocalDateTime timestamp; // Время отправки / Timestamp
+    private boolean edited;         // Было ли отредактировано / Whether it was edited
+    private boolean deleted;        // Было ли удалено (плейсхолдер вместо текста) / Whether it was deleted (placeholder instead of text)
 
     /**
      * Конвертация из Entity в DTO
@@ -40,6 +42,8 @@ public class ChatMessageDto {
                 .type(message.getType())
                 .mediaUrl(message.getMediaUrl())
                 .timestamp(message.getTimestamp())
+                .edited(message.isEdited())
+                .deleted(message.isDeleted())
                 .build();
     }
 }
