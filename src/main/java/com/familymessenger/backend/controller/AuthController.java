@@ -114,6 +114,7 @@ public class AuthController {
                     .body("Too many failed login attempts. Try again later / Слишком много неудачных попыток входа. Попробуйте позже");
         }
 
+        User user;
         try {
             // Аутентифицируем пользователя (проверяем username и password)
             // Authenticate user (check username and password)
@@ -124,27 +125,39 @@ public class AuthController {
                     )
             );
 
-            User user = userService.findByUsername(request.getUsername());
-
-            // Пароль верный - генерируем и отправляем одноразовый код на email
-            // Password is correct - generate and send a one-time code to email
-            String code = otpService.generateAndStore(user.getUsername());
-            emailService.sendOtpEmail(user.getEmail(), code);
-
-            log.info("OTP sent for username: {}", request.getUsername());
-
-            return ResponseEntity.ok(Map.of(
-                    "otpRequired", true,
-                    "message", "Verification code sent to email / Код подтверждения отправлен на email"
-            ));
-
+            user = userService.findByUsername(request.getUsername());
         } catch (Exception e) {
+            // Неверный пароль/username - это единственный случай, который считаем неудачной попыткой
+            // Wrong password/username - the only case counted as a failed attempt
             loginAttemptService.recordFailedAttempt(request.getUsername());
             log.error("Login failed for user: {}", request.getUsername(), e);
             return ResponseEntity
                     .status(HttpStatus.UNAUTHORIZED)
                     .body("Invalid username or password / Неверное имя пользователя или пароль");
         }
+
+        // Пароль верный - генерируем и отправляем одноразовый код на email.
+        // Ошибку отправки письма НЕ считаем неудачной попыткой входа (не вина пользователя),
+        // иначе временный сбой почты мог бы заблокировать пользователя с верным паролем.
+        // Password is correct - generate and send a one-time code to email.
+        // An email-sending failure is NOT counted as a failed login attempt (not the user's
+        // fault), otherwise a temporary mail outage could lock out a user with the right password.
+        try {
+            String code = otpService.generateAndStore(user.getUsername());
+            emailService.sendOtpEmail(user.getEmail(), code);
+        } catch (Exception e) {
+            log.error("Failed to send OTP email for user: {}", request.getUsername(), e);
+            return ResponseEntity
+                    .status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body("Could not send verification code, try again later / Не удалось отправить код подтверждения, попробуйте позже");
+        }
+
+        log.info("OTP sent for username: {}", request.getUsername());
+
+        return ResponseEntity.ok(Map.of(
+                "otpRequired", true,
+                "message", "Verification code sent to email / Код подтверждения отправлен на email"
+        ));
     }
 
     /**
