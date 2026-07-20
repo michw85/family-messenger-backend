@@ -1,9 +1,6 @@
 package com.familymessenger.backend.service;
 
-import com.google.firebase.messaging.FirebaseMessaging;
-import com.google.firebase.messaging.Message;
-import com.google.firebase.messaging.Notification;
-import lombok.RequiredArgsConstructor;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -11,40 +8,44 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 @Service
 @Slf4j
-@RequiredArgsConstructor
 public class FcmService {
 
     private final HttpClient httpClient = HttpClient.newHttpClient();
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
+    /**
+     * Отправка push-уведомления без дополнительных данных (обратная совместимость)
+     * Send a push notification without extra data (backward compatibility)
+     */
     public void sendPushNotification(String deviceToken, String title, String body) {
+        sendPushNotification(deviceToken, title, body, null);
+    }
+
+    /**
+     * Отправка push-уведомления с данными (например, roomId/roomName), чтобы
+     * при нажатии на уведомление приложение открыло нужный чат, а не просто
+     * стартовало с главного экрана.
+     * Send a push notification with data (e.g. roomId/roomName) so tapping the
+     * notification opens the right chat instead of just launching the app.
+     */
+    public void sendPushNotification(String deviceToken, String title, String body, Map<String, String> data) {
         try {
-            /*Notification notification = Notification.builder()
-                    .setTitle(title)
-                    .setBody(body)
-                    .build();
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("to", deviceToken);
+            payload.put("title", title);
+            payload.put("body", body);
+            payload.put("sound", "default");
+            payload.put("priority", "high");
+            if (data != null && !data.isEmpty()) {
+                payload.put("data", data);
+            }
 
-            Message message = Message.builder()
-                    .setToken(deviceToken)
-                    .setNotification(notification)
-                    .build();
-
-            String response = FirebaseMessaging.getInstance().send(message);
-            log.info("Push notification sent: {}", response);*/
-
-            String json = String.format("""
-                {
-                  "to": "%s",
-                  "title": "%s",
-                  "body": "%s",
-                  "sound": "default",
-                  "priority": "high"
-                }
-                """, deviceToken,
-                    title.replace("\"", "\\\""),
-                    body.replace("\"", "\\\""));
+            String json = objectMapper.writeValueAsString(payload);
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create("https://exp.host/--/api/v2/push/send"))

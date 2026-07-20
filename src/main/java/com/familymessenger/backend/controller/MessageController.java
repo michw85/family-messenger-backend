@@ -111,11 +111,16 @@ public class MessageController {
             }*/
         try {
             List<String> tokens = chatService.getParticipantFcmTokens(roomId, sender.getId());
+            Map<String, String> pushData = Map.of(
+                    "roomId", roomId,
+                    "roomName", savedMessage.getChatRoom().getName()
+            );
             for (String token : tokens) {
                 fcmService.sendPushNotification(
                         token,
                         "Новое сообщение от " + sender.getUsername(),
-                        content
+                        content,
+                        pushData
                 );
             }
         } catch (Exception e) {
