@@ -13,27 +13,35 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Сервис отправки email через HTTP API Resend (используется для одноразовых
+ * Сервис отправки email через HTTP API Brevo (используется для одноразовых
  * кодов входа - 2FA). Отправка идёт по HTTPS (порт 443), а не по SMTP,
  * потому что облачные провайдеры (в т.ч. DigitalOcean) по умолчанию блокируют
- * исходящий SMTP-трафик на дроплетах.
- * Email sending service via the Resend HTTP API (used for one-time login
+ * исходящий SMTP-трафик на дроплетах. В отличие от Resend без подтверждённого
+ * домена, Brevo с подтверждённым отправителем (email, без DNS) шлёт письма на
+ * любые адреса получателей, а не только на адрес аккаунта.
+ * Email sending service via the Brevo HTTP API (used for one-time login
  * codes - 2FA). Sends over HTTPS (port 443) instead of SMTP, because cloud
- * providers (including DigitalOcean) block outbound SMTP on droplets by default.
+ * providers (including DigitalOcean) block outbound SMTP on droplets by
+ * default. Unlike Resend without a verified domain, Brevo with a verified
+ * sender (just an email address, no DNS) delivers to any recipient, not only
+ * the account's own address.
  */
 @Slf4j
 @Service
 public class EmailService {
 
-    private static final String RESEND_API_URL = "https://api.resend.com/emails";
+    private static final String BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
 
     private final RestTemplate restTemplate;
 
-    @Value("${resend.api-key}")
+    @Value("${brevo.api-key}")
     private String apiKey;
 
-    @Value("${resend.from-address}")
+    @Value("${brevo.from-address}")
     private String fromAddress;
+
+    @Value("${brevo.from-name}")
+    private String fromName;
 
     public EmailService() {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
@@ -45,20 +53,20 @@ public class EmailService {
     public void sendOtpEmail(String to, String code) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setBearerAuth(apiKey);
+        headers.set("api-key", apiKey);
 
         Map<String, Object> body = Map.of(
-                "from", fromAddress,
-                "to", List.of(to),
+                "sender", Map.of("name", fromName, "email", fromAddress),
+                "to", List.of(Map.of("email", to)),
                 "subject", "Bonds — код подтверждения входа / Login verification code",
-                "text",
+                "textContent",
                 "Ваш код подтверждения: " + code + "\n" +
                         "Код действителен 5 минут. Если это были не вы, проигнорируйте это письмо.\n\n" +
                         "Your verification code: " + code + "\n" +
                         "The code is valid for 5 minutes. If this wasn't you, ignore this email."
         );
 
-        restTemplate.postForEntity(RESEND_API_URL, new HttpEntity<>(body, headers), String.class);
-        log.info("OTP email sent via Resend to: {}", to);
+        restTemplate.postForEntity(BREVO_API_URL, new HttpEntity<>(body, headers), String.class);
+        log.info("OTP email sent via Brevo to: {}", to);
     }
 }
