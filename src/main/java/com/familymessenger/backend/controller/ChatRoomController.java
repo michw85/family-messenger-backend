@@ -247,8 +247,12 @@ public class ChatRoomController {
                                                @AuthenticationPrincipal User user) {
         log.info("Removing participant {} from chat: {} by user: {}", userId, chatId, user.getUsername());
 
-        chatService.removeParticipant(chatId, userId, user.getId());
-        return ResponseEntity.noContent().build();
+        try {
+            chatService.removeParticipant(chatId, userId, user.getId());
+            return ResponseEntity.noContent().build();
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        }
     }
 
     /**
