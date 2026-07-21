@@ -12,7 +12,9 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -52,6 +54,17 @@ public class SecurityConfig {
                 .headers(headers -> headers.frameOptions(frameOptions -> frameOptions.disable())) // Для H2
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS) // Без сессий (используем JWT) / Stateless (using JWT)
+                )
+                // Без явного entryPoint Spring по умолчанию отвечает 403 (Http403ForbiddenEntryPoint)
+                // на любой запрос без валидного JWT - в том числе на протухший access-токен.
+                // Фронтенд же перевыпускает токен только по 401, поэтому протухший токен без
+                // этого исправления никогда не обновлялся автоматически и требовал ручного релогина.
+                // Without an explicit entry point Spring's default is to answer 403
+                // (Http403ForbiddenEntryPoint) for any request without a valid JWT - including an
+                // expired access token. The frontend only refreshes the token on 401, so without
+                // this fix an expired token never got auto-refreshed and forced a manual re-login.
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
                 )
                 .authorizeHttpRequests(auth -> auth
                         // Открытые эндпоинты (без авторизации) / Public endpoints (no auth required)
