@@ -6,8 +6,6 @@ services:
       POSTGRES_DB: messenger
       POSTGRES_USER: messenger_user
       POSTGRES_PASSWORD: messenger_pass
-    ports:
-      - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./postgres-init:/docker-entrypoint-initdb.d
@@ -18,8 +16,6 @@ services:
   redis:
     image: redis:7-alpine
     container_name: family-messenger-redis
-    ports:
-      - "6379:6379"
     volumes:
       - redis-data:/data
     command: redis-server --appendonly yes
@@ -35,8 +31,7 @@ services:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin123
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "127.0.0.1:9000:9000"
     volumes:
       - minio-data:/data
     networks:
@@ -47,7 +42,7 @@ services:
     build: .
     container_name: family-messenger-backend
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
