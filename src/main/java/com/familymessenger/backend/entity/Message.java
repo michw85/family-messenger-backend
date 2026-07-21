@@ -35,10 +35,14 @@ public class Message {
 
     private LocalDateTime timestamp;
 
-    @Column(nullable = false)
+    // columnDefinition даёт Hibernate указание на DEFAULT при авто-миграции схемы,
+    // иначе ALTER TABLE ADD COLUMN NOT NULL падает на таблице с существующими строками
+    // columnDefinition tells Hibernate to add a DEFAULT during schema auto-migration,
+    // otherwise ALTER TABLE ADD COLUMN NOT NULL fails on a table with existing rows
+    @Column(nullable = false, columnDefinition = "boolean default false")
     private boolean edited = false;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "boolean default false")
     private boolean deleted = false;
 
     @PrePersist
