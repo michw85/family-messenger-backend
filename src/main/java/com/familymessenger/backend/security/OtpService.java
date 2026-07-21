@@ -17,7 +17,7 @@ import java.time.Duration;
 @RequiredArgsConstructor
 public class OtpService {
 
-    private static final Duration OTP_TTL = Duration.ofMinutes(5);
+    private static final Duration OTP_TTL = Duration.ofMinutes(15);
     private static final String KEY_PREFIX = "login:otp:";
 
     private final StringRedisTemplate redisTemplate;

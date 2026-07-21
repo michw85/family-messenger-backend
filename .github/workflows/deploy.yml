@@ -22,14 +22,15 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: JWT_SECRET,BREVO_API_KEY,BREVO_FROM_ADDRESS,BREVO_FROM_NAME,CORS_ALLOWED_ORIGINS
+          envs: JWT_SECRET,GMAIL_CLIENT_ID,GMAIL_CLIENT_SECRET,GMAIL_REFRESH_TOKEN,GMAIL_SENDER_EMAIL,CORS_ALLOWED_ORIGINS
           script: |
             cd /app/backend
             cat > .env << EOF
             JWT_SECRET=${JWT_SECRET}
-            BREVO_API_KEY=${BREVO_API_KEY}
-            BREVO_FROM_ADDRESS=${BREVO_FROM_ADDRESS}
-            BREVO_FROM_NAME=${BREVO_FROM_NAME}
+            GMAIL_CLIENT_ID=${GMAIL_CLIENT_ID}
+            GMAIL_CLIENT_SECRET=${GMAIL_CLIENT_SECRET}
+            GMAIL_REFRESH_TOKEN=${GMAIL_REFRESH_TOKEN}
+            GMAIL_SENDER_EMAIL=${GMAIL_SENDER_EMAIL}
             CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
             EOF
             docker-compose down
@@ -37,7 +38,8 @@ jobs:
             docker-compose up -d --build
         env:
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
-          BREVO_FROM_ADDRESS: ${{ secrets.BREVO_FROM_ADDRESS }}
-          BREVO_FROM_NAME: ${{ secrets.BREVO_FROM_NAME }}
+          GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
+          GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
+          GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
+          GMAIL_SENDER_EMAIL: ${{ secrets.GMAIL_SENDER_EMAIL }}
           CORS_ALLOWED_ORIGINS: ${{ secrets.CORS_ALLOWED_ORIGINS }}
