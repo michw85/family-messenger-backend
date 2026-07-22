@@ -178,6 +178,11 @@ public class MessageController {
     @MessageMapping("/typing/{roomId}")
     public void typing(@DestinationVariable String roomId, Principal principal) {
 
+        User sender = chatService.getUserByUsername(principal.getName());
+        if (!chatService.isParticipant(roomId, sender.getId())) {
+            return;
+        }
+
         messagingTemplate.convertAndSend(
                 "/topic/room/" + roomId + "/typing",
                 Map.of("user", principal.getName(), "typing", true)
