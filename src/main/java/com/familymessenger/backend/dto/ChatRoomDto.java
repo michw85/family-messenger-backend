@@ -22,6 +22,10 @@ public class ChatRoomDto {
     private List<UserDto> participants;         // Список участников / List of participants
     private LocalDateTime createdAt;            // Дата создания / Creation date
     private LocalDateTime updatedAt;            // Дата обновления / Update date
+    private LocalDateTime lastActivityAt;       // Время последнего сообщения (или createdAt, если сообщений ещё нет) -
+                                                 // используется для сортировки списка чатов по активности /
+                                                 // Timestamp of the last message (or createdAt if there are no
+                                                 // messages yet) - used to sort the chat list by recent activity
 
     /**
      * Конвертирует Entity в DTO
@@ -31,6 +35,19 @@ public class ChatRoomDto {
      * @return DTO чата для передачи клиенту / chat DTO for client
      */
     public static ChatRoomDto fromEntity(ChatRoom chatRoom) {
+        return fromEntity(chatRoom, null);
+    }
+
+    /**
+     * Конвертирует Entity в DTO с явно переданным временем последней активности
+     * Converts Entity to DTO with an explicitly supplied last-activity timestamp
+     *
+     * @param chatRoom - сущность чата / chat entity
+     * @param lastActivityAt - время последнего сообщения в чате, либо null (тогда берётся createdAt) /
+     *                         timestamp of the chat's last message, or null (falls back to createdAt)
+     * @return DTO чата для передачи клиенту / chat DTO for client
+     */
+    public static ChatRoomDto fromEntity(ChatRoom chatRoom, LocalDateTime lastActivityAt) {
         // Проверка на null, чтобы избежать NullPointerException
         // Null check to avoid NullPointerException
         if (chatRoom == null) {
@@ -52,6 +69,7 @@ public class ChatRoomDto {
                         .collect(Collectors.toList()) : null)
                 .createdAt(chatRoom.getCreatedAt())
                 .updatedAt(chatRoom.getUpdatedAt())
+                .lastActivityAt(lastActivityAt != null ? lastActivityAt : chatRoom.getCreatedAt())
                 .build();
     }
 }

@@ -14,6 +14,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -45,7 +46,9 @@ public class ChatRoomController {
         log.info("Fetching chats for user: {}", user.getUsername());
         List<ChatRoom> chats = chatService.getChatsForUser(user.getId());
         List<ChatRoomDto> dtos = chats.stream()
-                .map(ChatRoomDto::fromEntity)
+                .map(chat -> ChatRoomDto.fromEntity(chat, chatService.getLastActivityTimestamp(chat)))
+                // Сначала - недавняя активность, а не порядок создания / Most recently active first, not creation order
+                .sorted(Comparator.comparing(ChatRoomDto::getLastActivityAt).reversed())
                 .collect(Collectors.toList());
         return ResponseEntity.ok(dtos);
     }

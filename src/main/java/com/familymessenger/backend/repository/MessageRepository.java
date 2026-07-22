@@ -16,6 +16,8 @@ public interface MessageRepository extends JpaRepository<Message, String> {
 
     Optional<Message> findFirstByMediaUrlEndingWith(String suffix);
 
+    Optional<Message> findFirstByChatRoomOrderByTimestampDesc(ChatRoom chatRoom);
+
     List<Message> findByChatRoomOrderByTimestampAsc(ChatRoom chatRoom);
 
     List<Message> findByChatRoomAndContentContainingIgnoreCaseOrderByTimestampDesc(ChatRoom chatRoom, String content);

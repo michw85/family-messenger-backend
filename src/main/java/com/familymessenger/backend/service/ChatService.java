@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.PageRequest;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -159,6 +160,20 @@ public class ChatService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
         return chatRoomRepository.findByParticipantsContaining(user);
+    }
+
+    /**
+     * Время последнего сообщения в чате (для сортировки списка чатов по
+     * активности) - если сообщений ещё нет, используется дата создания чата
+     * Timestamp of the chat's last message (for sorting the chat list by
+     * activity) - falls back to the chat's creation date if there are no
+     * messages yet
+     */
+    @Transactional(readOnly = true)
+    public LocalDateTime getLastActivityTimestamp(ChatRoom chatRoom) {
+        return messageRepository.findFirstByChatRoomOrderByTimestampDesc(chatRoom)
+                .map(Message::getTimestamp)
+                .orElse(chatRoom.getCreatedAt());
     }
 
     /**
