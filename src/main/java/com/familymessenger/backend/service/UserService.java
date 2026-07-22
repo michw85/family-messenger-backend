@@ -140,4 +140,29 @@ public class UserService {
         log.info("Avatar updated for user: {}", saved.getUsername());
         return saved;
     }
+
+    /**
+     * Поиск пользователя по email
+     * Find user by email
+     *
+     * @param email - email пользователя / user email
+     * @return пользователь, если найден / user, if found
+     */
+    public java.util.Optional<User> findByEmail(String email) {
+        return userRepository.findByEmail(email);
+    }
+
+    /**
+     * Установка нового пароля (используется при сбросе пароля)
+     * Set a new password (used during password reset)
+     *
+     * @param user - пользователь / user
+     * @param rawNewPassword - новый пароль в открытом виде / new plaintext password
+     */
+    @Transactional
+    public void updatePassword(User user, String rawNewPassword) {
+        user.setPassword(passwordEncoder.encode(rawNewPassword));
+        userRepository.save(user);
+        log.info("Password updated for user: {}", user.getUsername());
+    }
 }

@@ -72,7 +72,7 @@ public class SecurityConfig {
                         // поэтому не требуют действующего access-токена
                         // refresh/logout authenticate via the refresh token in the request body,
                         // not the JWT, so they don't require a valid access token
-                        .requestMatchers("/api/auth/login", "/api/auth/login/verify-otp", "/api/auth/register", "/api/auth/refresh", "/api/auth/logout").permitAll()
+                        .requestMatchers("/api/auth/login", "/api/auth/login/verify-otp", "/api/auth/register", "/api/auth/refresh", "/api/auth/logout", "/api/auth/forgot-password", "/api/auth/reset-password").permitAll()
                         .requestMatchers("/ws/**", "/ws").permitAll()
                         // Swagger UI (если добавим позже) / Swagger UI (if added later)
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()

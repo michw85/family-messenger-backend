@@ -110,4 +110,38 @@ public class EmailService {
         restTemplate.postForEntity(SEND_URL, new HttpEntity<>(Map.of("raw", encodedRaw), headers), String.class);
         log.info("OTP email sent via Gmail API to: {}", to);
     }
+
+    public void sendPasswordResetEmail(String to, String code) {
+        String accessToken = fetchAccessToken();
+
+        String subject = "Bonds — код сброса пароля / Password reset code";
+        String body =
+                "Ваш код для сброса пароля: " + code + "\n" +
+                        "Код действителен 15 минут. Если это были не вы, проигнорируйте это письмо - пароль останется прежним.\n\n" +
+                        "Your password reset code: " + code + "\n" +
+                        "The code is valid for 15 minutes. If this wasn't you, ignore this email - your password will stay unchanged.";
+
+        String encodedSubject = "=?UTF-8?B?"
+                + Base64.getEncoder().encodeToString(subject.getBytes(StandardCharsets.UTF_8))
+                + "?=";
+
+        String rawMessage =
+                "From: Bonds <" + senderEmail + ">\r\n" +
+                        "To: " + to + "\r\n" +
+                        "Subject: " + encodedSubject + "\r\n" +
+                        "MIME-Version: 1.0\r\n" +
+                        "Content-Type: text/plain; charset=\"UTF-8\"\r\n" +
+                        "Content-Transfer-Encoding: base64\r\n\r\n" +
+                        Base64.getMimeEncoder().encodeToString(body.getBytes(StandardCharsets.UTF_8));
+
+        String encodedRaw = Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(rawMessage.getBytes(StandardCharsets.UTF_8));
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(accessToken);
+
+        restTemplate.postForEntity(SEND_URL, new HttpEntity<>(Map.of("raw", encodedRaw), headers), String.class);
+        log.info("Password reset email sent via Gmail API to: {}", to);
+    }
 }

@@ -3,12 +3,14 @@ package com.familymessenger.backend.controller;
 import com.familymessenger.backend.dto.AuthRequest;
 import com.familymessenger.backend.dto.AuthResponse;
 import com.familymessenger.backend.dto.LoginRequest;
+import com.familymessenger.backend.dto.ResetPasswordRequest;
 import com.familymessenger.backend.dto.UserDto;
 import com.familymessenger.backend.entity.User;
 import com.familymessenger.backend.repository.UserRepository;
 import com.familymessenger.backend.security.JwtTokenProvider;
 import com.familymessenger.backend.security.LoginAttemptService;
 import com.familymessenger.backend.security.OtpService;
+import com.familymessenger.backend.security.PasswordResetService;
 import com.familymessenger.backend.security.RefreshTokenService;
 import com.familymessenger.backend.service.EmailService;
 import com.familymessenger.backend.service.UserService;
@@ -42,6 +44,7 @@ public class AuthController {
     private final RefreshTokenService refreshTokenService;
     private final OtpService otpService;
     private final EmailService emailService;
+    private final PasswordResetService passwordResetService;
 
     /**
      * Регистрация нового пользователя
@@ -274,5 +277,77 @@ public class AuthController {
         user.setFcmToken(token);
         userRepository.save(user);
         return ResponseEntity.ok().build();
+    }
+
+    /**
+     * Шаг 1 сброса пароля: отправка одноразового кода на email (если пользователь с таким email существует).
+     * Всегда возвращает один и тот же ответ независимо от того, найден email или нет -
+     * чтобы нельзя было проверять, зарегистрирован ли конкретный email (user enumeration).
+     * Password reset step 1: send a one-time code to the email (if a user with that email exists).
+     * Always returns the same response regardless of whether the email was found - so the
+     * endpoint can't be used to check whether a given email is registered (user enumeration).
+     *
+     * @param request - тело запроса с полем email / request body with an email field
+     */
+    @PostMapping("/forgot-password")
+    public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> request) {
+        String email = request.get("email");
+        if (email == null || email.isBlank()) {
+            return ResponseEntity.badRequest().body("email is required / email обязателен");
+        }
+
+        userService.findByEmail(email).ifPresent(user -> {
+            try {
+                String code = passwordResetService.generateAndStore(email);
+                emailService.sendPasswordResetEmail(email, code);
+                log.info("Password reset code sent for email: {}", email);
+            } catch (Exception e) {
+                log.error("Failed to send password reset email for: {}", email, e);
+            }
+        });
+
+        return ResponseEntity.ok(Map.of(
+                "message", "If this email is registered, a reset code has been sent / Если этот email зарегистрирован, на него отправлен код"
+        ));
+    }
+
+    /**
+     * Шаг 2 сброса пароля: проверка кода из email и установка нового пароля.
+     * Также отзывает все активные refresh-токены пользователя, чтобы старые
+     * сессии (в том числе на устройстве, где пароль забыли не по своей воле)
+     * перестали работать.
+     * Password reset step 2: verify the emailed code and set a new password.
+     * Also revokes all of the user's active refresh tokens, so old sessions
+     * (including on a device where the password was forgotten involuntarily)
+     * stop working.
+     *
+     * @param request - email, код из письма и новый пароль / email, the emailed code, and the new password
+     */
+    @PostMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        User user = userService.findByEmail(request.getEmail()).orElse(null);
+
+        // Намеренно проверяем код даже для несуществующего email, чтобы ответ не отличался
+        // по времени/логике от случая "email существует, но код неверный" - защита от enumeration
+        // Intentionally verify the code even for a non-existent email, so the response doesn't
+        // differ in timing/logic from the "email exists but code is wrong" case - enumeration guard
+        boolean codeValid = passwordResetService.verify(request.getEmail(), request.getCode());
+
+        if (user == null || !codeValid) {
+            log.warn("Invalid or expired password reset code for email: {}", request.getEmail());
+            return ResponseEntity
+                    .status(HttpStatus.BAD_REQUEST)
+                    .body("Invalid or expired code / Неверный или истёкший код");
+        }
+
+        userService.updatePassword(user, request.getNewPassword());
+        refreshTokenService.revokeAllForUser(user);
+        loginAttemptService.resetAttempts(user.getUsername());
+
+        log.info("Password reset successfully for user: {}", user.getUsername());
+
+        return ResponseEntity.ok(Map.of(
+                "message", "Password reset successfully / Пароль успешно изменён"
+        ));
     }
 }

@@ -107,4 +107,16 @@ public class RefreshTokenService {
                     refreshTokenRepository.save(rt);
                 });
     }
+
+    /**
+     * Отзывает все активные refresh-токены пользователя (например, после
+     * сброса пароля - чтобы все ранее выданные сессии перестали работать).
+     * Revokes all of the user's active refresh tokens (e.g. after a
+     * password reset - so every previously issued session stops working).
+     */
+    @Transactional
+    public void revokeAllForUser(User user) {
+        refreshTokenRepository.findByUserAndRevokedFalse(user)
+                .forEach(rt -> rt.setRevoked(true));
+    }
 }
