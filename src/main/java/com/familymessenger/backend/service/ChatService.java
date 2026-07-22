@@ -458,6 +458,55 @@ public class ChatService {
      * @param userId - ID пользователя / user ID
      * @param muted - true, чтобы заглушить, false - чтобы включить обратно / true to mute, false to unmute
      */
+    /**
+     * Отметить чат прочитанным текущим пользователем (до настоящего момента)
+     * Mark the chat as read by the current user (up to now)
+     *
+     * @param chatId - ID чата / chat ID
+     * @param userId - ID пользователя / user ID
+     * @return время, которое было записано как "прочитано до" / the timestamp recorded as "read up to"
+     */
+    @Transactional
+    public LocalDateTime markChatRead(String chatId, Long userId) {
+        ChatRoom chatRoom = chatRoomRepository.findById(chatId)
+                .orElseThrow(() -> new RuntimeException("Chat room not found"));
+
+        boolean isParticipant = chatRoom.getParticipants().stream()
+                .anyMatch(u -> u.getId().equals(userId));
+        if (!isParticipant) {
+            throw new RuntimeException("Not a participant of this chat");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        chatRoom.getLastReadAt().put(userId, now);
+        chatRoomRepository.save(chatRoom);
+        return now;
+    }
+
+    /**
+     * Прочитано ли сообщение всеми остальными участниками чата (не считая отправителя)
+     * Whether the message has been read by every other participant of the chat (excluding the sender)
+     */
+    public boolean isReadByAllOthers(ChatRoom chatRoom, Message message) {
+        Long senderId = message.getSender() != null ? message.getSender().getId() : null;
+        return chatRoom.getParticipants().stream()
+                .filter(p -> !p.getId().equals(senderId))
+                .allMatch(p -> {
+                    LocalDateTime lastRead = chatRoom.getLastReadAt().get(p.getId());
+                    return lastRead != null && !lastRead.isBefore(message.getTimestamp());
+                });
+    }
+
+    /**
+     * Получить чат по ID
+     * Get chat room by ID
+     */
+    @Transactional(readOnly = true)
+    public ChatRoom getChatRoomById(String chatId) {
+        return chatRoomRepository.findById(chatId)
+                .orElseThrow(() -> new RuntimeException("Chat room not found"));
+    }
+
     @Transactional
     public void setChatMuted(String chatId, Long userId, boolean muted) {
         ChatRoom chatRoom = chatRoomRepository.findById(chatId)

@@ -6,8 +6,10 @@ import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 @Entity
@@ -60,6 +62,21 @@ public class ChatRoom {
     @CollectionTable(name = "chat_muted_for", joinColumns = @JoinColumn(name = "chat_room_id"))
     @Column(name = "user_id")
     private Set<Long> mutedForUserIds = new HashSet<>();
+
+    /**
+     * Время, до которого каждый участник прочитал сообщения в этом чате
+     * (используется для галочек "прочитано" - сообщение считается прочитанным
+     * всеми, если время последнего сообщения не позже lastReadAt каждого
+     * из остальных участников)
+     * Timestamp up to which each participant has read messages in this chat
+     * (used for read receipts - a message counts as read by everyone once
+     * its timestamp is no later than every other participant's lastReadAt)
+     */
+    @ElementCollection
+    @CollectionTable(name = "chat_read_status", joinColumns = @JoinColumn(name = "chat_room_id"))
+    @MapKeyColumn(name = "user_id")
+    @Column(name = "last_read_at")
+    private Map<Long, LocalDateTime> lastReadAt = new HashMap<>();
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

@@ -26,6 +26,9 @@ public class ChatMessageDto {
     private LocalDateTime timestamp; // Время отправки / Timestamp
     private boolean edited;         // Было ли отредактировано / Whether it was edited
     private boolean deleted;        // Было ли удалено (плейсхолдер вместо текста) / Whether it was deleted (placeholder instead of text)
+    @Builder.Default
+    private boolean read = false;   // Прочитано ли всеми остальными участниками (вычисляется отдельно, не при создании) /
+                                     // Whether it's been read by every other participant (computed separately, not at creation)
 
     /**
      * Конвертация из Entity в DTO

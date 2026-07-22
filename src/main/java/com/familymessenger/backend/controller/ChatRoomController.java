@@ -88,11 +88,41 @@ public class ChatRoomController {
         }
 
         log.info("Fetching messages for chat: {} page {} by user: {}", chatId, page, user.getUsername());
+        ChatRoom chatRoom = chatService.getChatRoomById(chatId);
         List<Message> messages = chatService.getMessageHistory(chatId, page, size);
         List<ChatMessageDto> dtos = messages.stream()
-                .map(ChatMessageDto::fromEntity)
+                .map(m -> {
+                    ChatMessageDto dto = ChatMessageDto.fromEntity(m);
+                    dto.setRead(chatService.isReadByAllOthers(chatRoom, m));
+                    return dto;
+                })
                 .collect(Collectors.toList());
         return ResponseEntity.ok(dtos);
+    }
+
+    /**
+     * Отметить чат прочитанным текущим пользователем (до настоящего момента).
+     * Рассылает событие по WebSocket, чтобы отправитель сообщений увидел
+     * обновление галочек "прочитано" в реальном времени.
+     * Mark the chat as read by the current user (up to now). Broadcasts a
+     * WebSocket event so the message sender sees the read-receipt update live.
+     *
+     * @param chatId ID чата / chat ID
+     * @param user   текущий пользователь / current user
+     */
+    @PostMapping("/{chatId}/read")
+    public ResponseEntity<?> markChatRead(@PathVariable String chatId,
+                                          @AuthenticationPrincipal User user) {
+        try {
+            java.time.LocalDateTime readAt = chatService.markChatRead(chatId, user.getId());
+            messagingTemplate.convertAndSend(
+                    "/topic/room/" + chatId + "/read",
+                    Map.of("username", user.getUsername(), "readAt", readAt.toString())
+            );
+            return ResponseEntity.noContent().build();
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        }
     }
 
     /**
