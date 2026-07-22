@@ -1,9 +1,12 @@
 package com.familymessenger.backend.service;
 
+import com.familymessenger.backend.dto.ReactionSummaryDto;
 import com.familymessenger.backend.entity.ChatRoom;
 import com.familymessenger.backend.entity.Message;
+import com.familymessenger.backend.entity.MessageReaction;
 import com.familymessenger.backend.entity.User;
 import com.familymessenger.backend.repository.ChatRoomRepository;
+import com.familymessenger.backend.repository.MessageReactionRepository;
 import com.familymessenger.backend.repository.MessageRepository;
 import com.familymessenger.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -13,7 +16,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.PageRequest;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Сервис для работы с чатом
@@ -27,6 +32,7 @@ public class ChatService {
     private final MessageRepository messageRepository;
     private final ChatRoomRepository chatRoomRepository;
     private final UserRepository userRepository;
+    private final MessageReactionRepository messageReactionRepository;
 
     /**
      * Получение пользователя по username
@@ -532,5 +538,73 @@ public class ChatService {
             chatRoom.getMutedForUserIds().remove(userId);
         }
         chatRoomRepository.save(chatRoom);
+    }
+
+    /**
+     * Поставить/снять/заменить реакцию текущего пользователя на сообщение.
+     * Повторный выбор той же эмодзи снимает реакцию, выбор другой - заменяет.
+     * Toggle the current user's reaction on a message. Picking the same
+     * emoji again removes it, picking a different one replaces it.
+     *
+     * @param messageId - ID сообщения / message ID
+     * @param userId - ID пользователя / user ID
+     * @param emoji - эмодзи реакции / reaction emoji
+     * @return сообщение, к которому относится реакция / the message the reaction belongs to
+     */
+    @Transactional
+    public Message toggleReaction(String messageId, Long userId, String emoji) {
+        Message message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new RuntimeException("Message not found"));
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        boolean isParticipant = message.getChatRoom().getParticipants().stream()
+                .anyMatch(p -> p.getId().equals(userId));
+        if (!isParticipant) {
+            throw new RuntimeException("Not a participant of this chat");
+        }
+
+        messageReactionRepository.findByMessageAndUser(message, user).ifPresentOrElse(existing -> {
+            if (existing.getEmoji().equals(emoji)) {
+                messageReactionRepository.delete(existing);
+            } else {
+                existing.setEmoji(emoji);
+                messageReactionRepository.save(existing);
+            }
+        }, () -> {
+            MessageReaction reaction = new MessageReaction();
+            reaction.setMessage(message);
+            reaction.setUser(user);
+            reaction.setEmoji(emoji);
+            messageReactionRepository.save(reaction);
+        });
+
+        return message;
+    }
+
+    /**
+     * Сводка реакций на сообщение, сгруппированных по эмодзи. Не зависит от
+     * конкретного зрителя - годится и для REST-ответа, и для WS-рассылки всем.
+     * Reaction summary for a message, grouped by emoji. Not viewer-specific -
+     * works for both the REST response and the WebSocket broadcast to everyone.
+     *
+     * @param message - сообщение / message
+     */
+    @Transactional(readOnly = true)
+    public List<ReactionSummaryDto> getReactionSummary(Message message) {
+        List<MessageReaction> reactions = messageReactionRepository.findByMessage(message);
+        java.util.Map<String, List<MessageReaction>> byEmoji = reactions.stream()
+                .collect(Collectors.groupingBy(MessageReaction::getEmoji));
+
+        return byEmoji.entrySet().stream()
+                .map(entry -> ReactionSummaryDto.builder()
+                        .emoji(entry.getKey())
+                        .count(entry.getValue().size())
+                        .usernames(entry.getValue().stream()
+                                .map(r -> r.getUser().getUsername())
+                                .collect(Collectors.toList()))
+                        .build())
+                .sorted(Comparator.comparing(ReactionSummaryDto::getEmoji))
+                .collect(Collectors.toList());
     }
 }

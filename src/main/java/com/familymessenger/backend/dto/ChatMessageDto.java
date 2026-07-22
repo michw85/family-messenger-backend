@@ -33,6 +33,9 @@ public class ChatMessageDto {
     @Builder.Default
     private boolean read = false;   // Прочитано ли всеми остальными участниками (вычисляется отдельно, не при создании) /
                                      // Whether it's been read by every other participant (computed separately, not at creation)
+    @Builder.Default
+    private java.util.List<ReactionSummaryDto> reactions = java.util.List.of(); // Реакции на сообщение (вычисляются отдельно) /
+                                     // Reactions on the message (computed separately)
 
     /**
      * Конвертация из Entity в DTO

@@ -94,10 +94,45 @@ public class ChatRoomController {
                 .map(m -> {
                     ChatMessageDto dto = ChatMessageDto.fromEntity(m);
                     dto.setRead(chatService.isReadByAllOthers(chatRoom, m));
+                    dto.setReactions(chatService.getReactionSummary(m));
                     return dto;
                 })
                 .collect(Collectors.toList());
         return ResponseEntity.ok(dtos);
+    }
+
+    /**
+     * Поставить/снять/заменить реакцию на сообщение (рассылается по WebSocket всем в чате)
+     * Toggle a reaction on a message (broadcast over WebSocket to everyone in the chat)
+     *
+     * @param chatId    ID чата / chat ID
+     * @param messageId ID сообщения / message ID
+     * @param request   тело запроса с полем emoji / request body with an emoji field
+     * @param user      текущий пользователь / current user
+     */
+    @PostMapping("/{chatId}/messages/{messageId}/reactions")
+    public ResponseEntity<?> toggleReaction(@PathVariable String chatId,
+                                            @PathVariable String messageId,
+                                            @RequestBody Map<String, String> request,
+                                            @AuthenticationPrincipal User user) {
+        String emoji = request.get("emoji");
+        if (emoji == null || emoji.isBlank()) {
+            return ResponseEntity.badRequest().body("emoji is required / emoji обязателен");
+        }
+
+        try {
+            Message message = chatService.toggleReaction(messageId, user.getId(), emoji);
+            List<ReactionSummaryDto> summary = chatService.getReactionSummary(message);
+
+            messagingTemplate.convertAndSend(
+                    "/topic/room/" + chatId + "/reactions",
+                    Map.of("messageId", messageId, "reactions", summary)
+            );
+
+            return ResponseEntity.ok(summary);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        }
     }
 
     /**
