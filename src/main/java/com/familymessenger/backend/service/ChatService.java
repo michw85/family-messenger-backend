@@ -45,7 +45,7 @@ public class ChatService {
      * Save message in chat room
      */
     @Transactional
-    public Message saveMessage(String content, String roomId, User sender, Message.MessageType type, String mediaUrl) {
+    public Message saveMessage(String content, String roomId, User sender, Message.MessageType type, String mediaUrl, String replyToId) {
 
         log.debug("Saving message from {} in room {}", sender.getUsername(), roomId);
 
@@ -65,6 +65,14 @@ public class ChatService {
         message.setSender(sender);
         message.setType(type != null ? type : Message.MessageType.TEXT);
         message.setMediaUrl(mediaUrl);
+
+        // Если это ответ - находим оригинал, но только если он из того же чата
+        // If this is a reply - look up the original, but only if it's from the same chat
+        if (replyToId != null && !replyToId.isBlank()) {
+            messageRepository.findById(replyToId)
+                    .filter(original -> original.getChatRoom().getId().equals(roomId))
+                    .ifPresent(message::setReplyTo);
+        }
 
         // Новое сообщение "возвращает" чат тем, кто ранее удалил его у себя
         // A new message "brings back" the chat for anyone who'd deleted it for themselves

@@ -25,6 +25,14 @@ public class Message {
     @JoinColumn(name = "sender_id")
     private User sender;
 
+    /**
+     * Сообщение, на которое отвечает это (null, если это не ответ)
+     * The message this one is replying to (null if it's not a reply)
+     */
+    @ManyToOne
+    @JoinColumn(name = "reply_to_id")
+    private Message replyTo;
+
     @Column(columnDefinition = "TEXT")
     private String content;
 

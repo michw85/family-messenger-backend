@@ -94,7 +94,8 @@ public class MessageController {
                 roomId,
                 sender,
                chatMessageDto.getType() != null ? chatMessageDto.getType() : Message.MessageType.TEXT,
-                chatMessageDto.getMediaUrl()
+                chatMessageDto.getMediaUrl(),
+                chatMessageDto.getReplyToId()
         );
 
         // Отправить уведомления участникам

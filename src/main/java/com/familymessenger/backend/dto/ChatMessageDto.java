@@ -24,6 +24,10 @@ public class ChatMessageDto {
     private Message.MessageType type; // Тип сообщения (TEXT, IMAGE, VOICE) / Message type
     private String mediaUrl;        // Ссылка на файл (фото/голос) / Media file URL
     private LocalDateTime timestamp; // Время отправки / Timestamp
+    private String replyToId;       // ID сообщения, на которое отвечают (входящее поле от клиента) /
+                                     // ID of the message being replied to (incoming field from the client)
+    private ReplyPreviewDto replyTo; // Превью сообщения, на которое отвечают (исходящее поле для клиента) /
+                                     // Preview of the message being replied to (outgoing field for the client)
     private boolean edited;         // Было ли отредактировано / Whether it was edited
     private boolean deleted;        // Было ли удалено (плейсхолдер вместо текста) / Whether it was deleted (placeholder instead of text)
     @Builder.Default
@@ -45,6 +49,8 @@ public class ChatMessageDto {
                 .type(message.getType())
                 .mediaUrl(message.getMediaUrl())
                 .timestamp(message.getTimestamp())
+                .replyToId(message.getReplyTo() != null ? message.getReplyTo().getId() : null)
+                .replyTo(ReplyPreviewDto.fromEntity(message.getReplyTo()))
                 .edited(message.isEdited())
                 .deleted(message.isDeleted())
                 .build();
