@@ -183,8 +183,34 @@ public class ChatRoomController {
                                         @AuthenticationPrincipal User user) {
         log.info("Deleting chat {} by user: {}", chatId, user.getUsername());
 
-        chatService.deleteChat(chatId, user.getId());
-        return ResponseEntity.noContent().build();
+        try {
+            chatService.deleteChat(chatId, user.getId());
+            return ResponseEntity.noContent().build();
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        }
+    }
+
+    /**
+     * Покинуть/удалить чат для себя (для группового чата - выход из
+     * участников, для личного - скрыть чат только у себя)
+     * Leave/delete a chat for yourself (leaves the participant list for
+     * group chats, hides the chat for personal ones)
+     *
+     * @param chatId ID чата / chat ID
+     * @param user   текущий пользователь / current user
+     */
+    @PostMapping("/{chatId}/leave")
+    public ResponseEntity<?> leaveChat(@PathVariable String chatId,
+                                       @AuthenticationPrincipal User user) {
+        log.info("User {} leaving chat {}", user.getUsername(), chatId);
+
+        try {
+            chatService.leaveChat(chatId, user.getId());
+            return ResponseEntity.noContent().build();
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        }
     }
 
     /**

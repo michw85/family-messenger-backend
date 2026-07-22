@@ -6,7 +6,9 @@ import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Entity
 @Table(name = "chat_rooms")
@@ -36,6 +38,19 @@ public class ChatRoom {
             inverseJoinColumns = @JoinColumn(name = "user_id")
     )
     private List<User> participants = new ArrayList<>();
+
+    /**
+     * ID пользователей, которые "удалили" этот чат у себя (личные чаты) -
+     * чат при этом продолжает существовать для остальных участников.
+     * Автоматически очищается, когда в чат приходит новое сообщение.
+     * IDs of users who have "deleted" this chat for themselves (personal
+     * chats) - the chat still exists for the other participant(s).
+     * Automatically cleared when a new message arrives in the chat.
+     */
+    @ElementCollection
+    @CollectionTable(name = "chat_hidden_for", joinColumns = @JoinColumn(name = "chat_room_id"))
+    @Column(name = "user_id")
+    private Set<Long> hiddenForUserIds = new HashSet<>();
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

@@ -66,6 +66,13 @@ public class ChatService {
         message.setType(type != null ? type : Message.MessageType.TEXT);
         message.setMediaUrl(mediaUrl);
 
+        // Новое сообщение "возвращает" чат тем, кто ранее удалил его у себя
+        // A new message "brings back" the chat for anyone who'd deleted it for themselves
+        if (!chatRoom.getHiddenForUserIds().isEmpty()) {
+            chatRoom.getHiddenForUserIds().clear();
+            chatRoomRepository.save(chatRoom);
+        }
+
         // Сохраняем в базу данных
         // Save to database
         Message savedMessage = messageRepository.save(message);
@@ -159,7 +166,9 @@ public class ChatService {
     public List<ChatRoom> getChatsForUser(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
-        return chatRoomRepository.findByParticipantsContaining(user);
+        return chatRoomRepository.findByParticipantsContaining(user).stream()
+                .filter(chat -> !chat.getHiddenForUserIds().contains(userId))
+                .collect(java.util.stream.Collectors.toList());
     }
 
     /**
@@ -275,6 +284,58 @@ public class ChatService {
 
         chatRoom.getParticipants().remove(userToRemove);
         chatRoomRepository.save(chatRoom);
+    }
+
+    /**
+     * Покинуть/удалить чат для себя.
+     * В групповых чатах - выходим из числа участников (как и раньше умел
+     * делать removeParticipant для самого себя). В личных чатах (DIRECT/FAMILY)
+     * участника нельзя просто убрать - там чат лишь скрывается у текущего
+     * пользователя (и снова появится, если придёт новое сообщение).
+     * Если после этого чат не виден никому из участников, он удаляется целиком.
+     *
+     * Leave/delete a chat for yourself.
+     * In group chats - leave the participant list (same behavior
+     * removeParticipant already supported for self-removal). In personal
+     * chats (DIRECT/FAMILY) a participant can't just be removed - the chat
+     * is instead hidden for the current user only (and reappears if a new
+     * message arrives). If nobody can see the chat anymore afterwards, it's
+     * deleted entirely.
+     *
+     * @param chatId - ID чата / chat ID
+     * @param userId - ID текущего пользователя / current user ID
+     */
+    @Transactional
+    public void leaveChat(String chatId, Long userId) {
+        ChatRoom chatRoom = chatRoomRepository.findById(chatId)
+                .orElseThrow(() -> new RuntimeException("Chat room not found"));
+
+        boolean isParticipant = chatRoom.getParticipants().stream()
+                .anyMatch(u -> u.getId().equals(userId));
+        if (!isParticipant) {
+            throw new RuntimeException("Not a participant of this chat");
+        }
+
+        if (chatRoom.getType() == ChatRoom.RoomType.GROUP) {
+            chatRoom.getParticipants().removeIf(u -> u.getId().equals(userId));
+            if (chatRoom.getParticipants().isEmpty()) {
+                chatRoomRepository.delete(chatRoom);
+                log.info("Chat {} deleted - last participant left", chatId);
+                return;
+            }
+        } else {
+            chatRoom.getHiddenForUserIds().add(userId);
+            boolean hiddenForEveryone = chatRoom.getParticipants().stream()
+                    .allMatch(u -> chatRoom.getHiddenForUserIds().contains(u.getId()));
+            if (hiddenForEveryone) {
+                chatRoomRepository.delete(chatRoom);
+                log.info("Chat {} deleted - hidden for all participants", chatId);
+                return;
+            }
+        }
+
+        chatRoomRepository.save(chatRoom);
+        log.info("User {} left/hid chat {}", userId, chatId);
     }
 
     /**
