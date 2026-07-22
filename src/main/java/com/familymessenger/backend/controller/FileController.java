@@ -127,6 +127,92 @@ public class FileController {
     }
 
     /**
+     * Загрузка видео
+     * Upload video
+     *
+     * @param file - видеофайл / video file
+     * @param user - текущий пользователь / current user
+     * @return ссылка на загруженный файл / uploaded file URL
+     */
+    @PostMapping("/upload/video")
+    public ResponseEntity<?> uploadVideo(@RequestParam("file") MultipartFile file,
+                                         @AuthenticationPrincipal User user) {
+
+        log.info("Uploading video: {} by user: {}", file.getOriginalFilename(), user.getUsername());
+
+        try {
+            if (file.isEmpty()) {
+                return ResponseEntity.badRequest().body("File is empty / Файл пуст");
+            }
+
+            String contentType = file.getContentType();
+            if (contentType == null || !contentType.startsWith("video/")) {
+                return ResponseEntity.badRequest().body("Only video files are allowed / Разрешены только видеофайлы");
+            }
+
+            // Проверка размера (максимум 50 МБ для видео)
+            // Check file size (max 50 MB for video)
+            if (file.getSize() > 50 * 1024 * 1024) {
+                return ResponseEntity.badRequest().body("Video size exceeds 50MB / Размер видео превышает 50 МБ");
+            }
+
+            String fileUrl = fileService.uploadFile(file, "videos", user);
+
+            return ResponseEntity.ok(Map.of(
+                    "url", fileUrl,
+                    "type", "video",
+                    "message", "Video uploaded successfully / Видео успешно загружено"
+            ));
+
+        } catch (Exception e) {
+            log.error("Failed to upload video: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Failed to upload video / Ошибка загрузки видео");
+        }
+    }
+
+    /**
+     * Загрузка произвольного файла/документа
+     * Upload an arbitrary file/document
+     *
+     * @param file - файл / file
+     * @param user - текущий пользователь / current user
+     * @return ссылка на загруженный файл / uploaded file URL
+     */
+    @PostMapping("/upload/file")
+    public ResponseEntity<?> uploadDocument(@RequestParam("file") MultipartFile file,
+                                            @AuthenticationPrincipal User user) {
+
+        log.info("Uploading file: {} by user: {}", file.getOriginalFilename(), user.getUsername());
+
+        try {
+            if (file.isEmpty()) {
+                return ResponseEntity.badRequest().body("File is empty / Файл пуст");
+            }
+
+            // Проверка размера (максимум 20 МБ для произвольных файлов)
+            // Check file size (max 20 MB for arbitrary files)
+            if (file.getSize() > 20 * 1024 * 1024) {
+                return ResponseEntity.badRequest().body("File size exceeds 20MB / Размер файла превышает 20 МБ");
+            }
+
+            String fileUrl = fileService.uploadFile(file, "files", user);
+
+            return ResponseEntity.ok(Map.of(
+                    "url", fileUrl,
+                    "type", "file",
+                    "originalFilename", file.getOriginalFilename() != null ? file.getOriginalFilename() : "file",
+                    "message", "File uploaded successfully / Файл успешно загружен"
+            ));
+
+        } catch (Exception e) {
+            log.error("Failed to upload file: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Failed to upload file / Ошибка загрузки файла");
+        }
+    }
+
+    /**
      * Получение файла (для доступа к загруженным файлам).
      * Доступ разрешён только участникам чата, к которому относится файл.
      * Get file (for accessing uploaded files).
