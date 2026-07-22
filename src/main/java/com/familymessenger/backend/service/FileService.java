@@ -5,10 +5,15 @@ import io.minio.*;
 import io.minio.errors.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.coobird.thumbnailator.Thumbnails;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -30,6 +35,11 @@ public class FileService {
 
     @Value("${minio.url}")
     private String minioUrl;
+
+    // Изображения длиннее/шире этого значения (px) уменьшаются перед сохранением
+    private static final int MAX_IMAGE_DIMENSION = 1600;
+    // Качество JPEG после пережатия (0.0-1.0)
+    private static final float IMAGE_OUTPUT_QUALITY = 0.82f;
 
     /**
      * Загрузка файла в MinIO
@@ -60,6 +70,25 @@ public class FileService {
             extension = originalFilename.substring(originalFilename.lastIndexOf("."));
         }
 
+        // Для изображений уменьшаем разрешение и пережимаем в JPEG перед сохранением,
+        // чтобы не хранить в MinIO полноразмерные фото с камеры
+        // For images, downscale and re-encode as JPEG before saving,
+        // so we don't store full camera-resolution photos in MinIO
+        byte[] uploadBytes;
+        String uploadContentType = file.getContentType();
+        if ("images".equals(folder) && uploadContentType != null && uploadContentType.startsWith("image/")) {
+            byte[] compressed = compressImage(file);
+            if (compressed != null) {
+                uploadBytes = compressed;
+                uploadContentType = "image/jpeg";
+                extension = ".jpg";
+            } else {
+                uploadBytes = file.getBytes();
+            }
+        } else {
+            uploadBytes = file.getBytes();
+        }
+
         String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
         String uniqueId = UUID.randomUUID().toString().substring(0, 8);
         String filename = String.format("%s/%s_%s_%s%s",
@@ -71,13 +100,13 @@ public class FileService {
 
         // Загружаем файл в MinIO
         // Upload file to MinIO
-        try (InputStream inputStream = file.getInputStream()) {
+        try (InputStream inputStream = new ByteArrayInputStream(uploadBytes)) {
             minioClient.putObject(
                     PutObjectArgs.builder()
                             .bucket(bucketName)
                             .object(filename)
-                            .stream(inputStream, file.getSize(), -1)
-                            .contentType(file.getContentType())
+                            .stream(inputStream, uploadBytes.length, -1)
+                            .contentType(uploadContentType)
                             .build()
             );
         }
@@ -90,6 +119,49 @@ public class FileService {
         log.info("File uploaded successfully: {}", fileUrl);
 
         return fileUrl;
+    }
+
+    /**
+     * Уменьшает разрешение (если оно больше MAX_IMAGE_DIMENSION по любой стороне)
+     * и пережимает изображение в JPEG заданного качества.
+     * Возвращает null, если файл не удалось декодировать как растровое изображение
+     * (тогда исходные байты сохраняются как есть).
+     * Downscales (if larger than MAX_IMAGE_DIMENSION on either side) and
+     * re-encodes the image as JPEG at the configured quality.
+     * Returns null if the file couldn't be decoded as a raster image
+     * (the original bytes are then stored as-is).
+     */
+    private byte[] compressImage(MultipartFile file) throws Exception {
+        BufferedImage original;
+        try (InputStream in = file.getInputStream()) {
+            original = ImageIO.read(in);
+        }
+        if (original == null) {
+            log.warn("Could not decode image {}, storing original bytes", file.getOriginalFilename());
+            return null;
+        }
+
+        int width = original.getWidth();
+        int height = original.getHeight();
+        int targetWidth = width;
+        int targetHeight = height;
+        if (width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION) {
+            double scale = Math.min((double) MAX_IMAGE_DIMENSION / width, (double) MAX_IMAGE_DIMENSION / height);
+            targetWidth = Math.max(1, (int) Math.round(width * scale));
+            targetHeight = Math.max(1, (int) Math.round(height * scale));
+        }
+
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        Thumbnails.of(original)
+                .size(targetWidth, targetHeight)
+                .outputFormat("jpg")
+                .outputQuality(IMAGE_OUTPUT_QUALITY)
+                .toOutputStream(out);
+
+        log.info("Compressed image {}x{} -> {}x{} ({} -> {} bytes)",
+                width, height, targetWidth, targetHeight, file.getSize(), out.size());
+
+        return out.toByteArray();
     }
 
     /**

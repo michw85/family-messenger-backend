@@ -33,6 +33,8 @@ dependencies {
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	testAnnotationProcessor 'org.projectlombok:lombok'
 	implementation 'io.minio:minio:8.5.7'
+	// Серверное сжатие/уменьшение изображений перед сохранением в MinIO
+	implementation 'net.coobird:thumbnailator:0.4.20'
 	// H2 база данных для разработки
 	runtimeOnly 'com.h2database:h2'
 
