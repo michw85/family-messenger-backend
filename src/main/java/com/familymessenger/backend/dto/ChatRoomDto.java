@@ -26,6 +26,9 @@ public class ChatRoomDto {
                                                  // используется для сортировки списка чатов по активности /
                                                  // Timestamp of the last message (or createdAt if there are no
                                                  // messages yet) - used to sort the chat list by recent activity
+    @Builder.Default
+    private boolean mutedForCurrentUser = false; // Заглушён ли чат для запрашивающего пользователя /
+                                                  // Whether the chat is muted for the requesting user
 
     /**
      * Конвертирует Entity в DTO

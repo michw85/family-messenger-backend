@@ -443,8 +443,37 @@ public class ChatService {
                 .orElseThrow(() -> new RuntimeException("Chat room not found"));
         return chatRoom.getParticipants().stream()
                 .filter(u -> !u.getId().equals(excludeUserId))
+                // Не шлём пуш тем, кто заглушил этот чат / Skip push for anyone who muted this chat
+                .filter(u -> !chatRoom.getMutedForUserIds().contains(u.getId()))
                 .map(User::getFcmToken)
                 .filter(token -> token != null && !token.isEmpty())
                 .collect(java.util.stream.Collectors.toList());
+    }
+
+    /**
+     * Заглушить/включить уведомления по чату для текущего пользователя
+     * Mute/unmute push notifications for this chat for the current user
+     *
+     * @param chatId - ID чата / chat ID
+     * @param userId - ID пользователя / user ID
+     * @param muted - true, чтобы заглушить, false - чтобы включить обратно / true to mute, false to unmute
+     */
+    @Transactional
+    public void setChatMuted(String chatId, Long userId, boolean muted) {
+        ChatRoom chatRoom = chatRoomRepository.findById(chatId)
+                .orElseThrow(() -> new RuntimeException("Chat room not found"));
+
+        boolean isParticipant = chatRoom.getParticipants().stream()
+                .anyMatch(u -> u.getId().equals(userId));
+        if (!isParticipant) {
+            throw new RuntimeException("Not a participant of this chat");
+        }
+
+        if (muted) {
+            chatRoom.getMutedForUserIds().add(userId);
+        } else {
+            chatRoom.getMutedForUserIds().remove(userId);
+        }
+        chatRoomRepository.save(chatRoom);
     }
 }

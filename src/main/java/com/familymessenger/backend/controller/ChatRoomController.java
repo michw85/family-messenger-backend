@@ -46,7 +46,11 @@ public class ChatRoomController {
         log.info("Fetching chats for user: {}", user.getUsername());
         List<ChatRoom> chats = chatService.getChatsForUser(user.getId());
         List<ChatRoomDto> dtos = chats.stream()
-                .map(chat -> ChatRoomDto.fromEntity(chat, chatService.getLastActivityTimestamp(chat)))
+                .map(chat -> {
+                    ChatRoomDto dto = ChatRoomDto.fromEntity(chat, chatService.getLastActivityTimestamp(chat));
+                    dto.setMutedForCurrentUser(chat.getMutedForUserIds().contains(user.getId()));
+                    return dto;
+                })
                 // Сначала - недавняя активность, а не порядок создания / Most recently active first, not creation order
                 .sorted(Comparator.comparing(ChatRoomDto::getLastActivityAt).reversed())
                 .collect(Collectors.toList());
@@ -207,6 +211,42 @@ public class ChatRoomController {
 
         try {
             chatService.leaveChat(chatId, user.getId());
+            return ResponseEntity.noContent().build();
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        }
+    }
+
+    /**
+     * Заглушить уведомления по чату для текущего пользователя
+     * Mute push notifications for this chat for the current user
+     *
+     * @param chatId ID чата / chat ID
+     * @param user   текущий пользователь / current user
+     */
+    @PostMapping("/{chatId}/mute")
+    public ResponseEntity<?> muteChat(@PathVariable String chatId,
+                                      @AuthenticationPrincipal User user) {
+        try {
+            chatService.setChatMuted(chatId, user.getId(), true);
+            return ResponseEntity.noContent().build();
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        }
+    }
+
+    /**
+     * Включить уведомления по чату для текущего пользователя обратно
+     * Unmute push notifications for this chat for the current user
+     *
+     * @param chatId ID чата / chat ID
+     * @param user   текущий пользователь / current user
+     */
+    @DeleteMapping("/{chatId}/mute")
+    public ResponseEntity<?> unmuteChat(@PathVariable String chatId,
+                                        @AuthenticationPrincipal User user) {
+        try {
+            chatService.setChatMuted(chatId, user.getId(), false);
             return ResponseEntity.noContent().build();
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());

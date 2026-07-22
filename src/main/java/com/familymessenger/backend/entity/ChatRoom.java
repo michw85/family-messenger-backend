@@ -52,6 +52,15 @@ public class ChatRoom {
     @Column(name = "user_id")
     private Set<Long> hiddenForUserIds = new HashSet<>();
 
+    /**
+     * ID пользователей, которые заглушили уведомления по этому чату
+     * IDs of users who have muted push notifications for this chat
+     */
+    @ElementCollection
+    @CollectionTable(name = "chat_muted_for", joinColumns = @JoinColumn(name = "chat_room_id"))
+    @Column(name = "user_id")
+    private Set<Long> mutedForUserIds = new HashSet<>();
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
