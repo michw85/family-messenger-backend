@@ -148,7 +148,12 @@ public class FileController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        if (!chatService.canAccessMediaFile(filename, user.getId())) {
+        // Аватары не привязаны к конкретному чату - их может видеть любой
+        // авторизованный пользователь приложения (как в большинстве мессенджеров)
+        // Avatars aren't scoped to a chat - any authenticated app user can view them
+        boolean isAvatar = filename.startsWith("avatars/");
+
+        if (!isAvatar && !chatService.canAccessMediaFile(filename, user.getId())) {
             log.warn("User {} denied access to file: {}", user.getUsername(), filename);
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body("You do not have access to this file / Нет доступа к этому файлу");

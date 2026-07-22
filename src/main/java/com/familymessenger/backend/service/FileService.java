@@ -76,7 +76,8 @@ public class FileService {
         // so we don't store full camera-resolution photos in MinIO
         byte[] uploadBytes;
         String uploadContentType = file.getContentType();
-        if ("images".equals(folder) && uploadContentType != null && uploadContentType.startsWith("image/")) {
+        boolean isImageFolder = "images".equals(folder) || "avatars".equals(folder);
+        if (isImageFolder && uploadContentType != null && uploadContentType.startsWith("image/")) {
             byte[] compressed = compressImage(file);
             if (compressed != null) {
                 uploadBytes = compressed;

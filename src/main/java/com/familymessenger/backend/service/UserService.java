@@ -123,4 +123,21 @@ public class UserService {
         }
         return userRepository.searchUsers(query, currentUserId);
     }
+
+    /**
+     * Обновление ссылки на аватар пользователя
+     * Update the user's avatar URL
+     *
+     * @param userId - идентификатор пользователя / user id
+     * @param avatarUrl - публичная ссылка на файл аватара / public avatar file URL
+     * @return обновлённый пользователь / updated user
+     */
+    @Transactional
+    public User updateAvatar(Long userId, String avatarUrl) {
+        User user = findById(userId);
+        user.setAvatarUrl(avatarUrl);
+        User saved = userRepository.save(user);
+        log.info("Avatar updated for user: {}", saved.getUsername());
+        return saved;
+    }
 }
