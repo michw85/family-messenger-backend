@@ -381,17 +381,21 @@ public class ChatRoomController {
      * @return обновлённый список участников / updated list of participants
      */
     @PostMapping("/{chatId}/participants")
-    public ResponseEntity<List<UserDto>> addParticipants(@PathVariable String chatId,
-                                                         @RequestBody List<Long> userIds,
-                                                         @AuthenticationPrincipal User user) {
+    public ResponseEntity<?> addParticipants(@PathVariable String chatId,
+                                             @RequestBody List<Long> userIds,
+                                             @AuthenticationPrincipal User user) {
         log.info("Adding participants to chat: {} by user: {}", chatId, user.getUsername());
 
-        List<User> updatedParticipants = chatService.addParticipants(chatId, userIds, user.getId());
-        List<UserDto> dtos = updatedParticipants.stream()
-                .map(UserDto::fromEntity)
-                .collect(Collectors.toList());
+        try {
+            List<User> updatedParticipants = chatService.addParticipants(chatId, userIds, user.getId());
+            List<UserDto> dtos = updatedParticipants.stream()
+                    .map(UserDto::fromEntity)
+                    .collect(Collectors.toList());
 
-        return ResponseEntity.ok(dtos);
+            return ResponseEntity.ok(dtos);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        }
     }
 
     /**

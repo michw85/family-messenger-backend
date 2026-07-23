@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -36,22 +37,42 @@ public class SecurityConfig {
     private String allowedOrigins;
 
     /**
+     * Отдельная, более узкая цепочка фильтров только для H2-консоли: она нуждается
+     * в отключённом X-Frame-Options (рисует себя во фрейме), но раньше этот флаг
+     * снимался для ВСЕГО приложения, включая production-профиль, где H2 вообще не
+     * используется - это открывало сайт для clickjacking без всякой необходимости.
+     * A narrower filter chain just for the H2 console: it needs X-Frame-Options
+     * disabled (renders itself inside a frame), but that used to be disabled for
+     * the ENTIRE app, including the production profile where H2 isn't even used -
+     * needlessly opening up clickjacking exposure.
+     */
+    @Bean
+    @Order(1)
+    public SecurityFilterChain h2ConsoleFilterChain(HttpSecurity http) throws Exception {
+        http
+                .securityMatcher("/h2-console/**")
+                .csrf(csrf -> csrf.disable())
+                .headers(headers -> headers.frameOptions(frameOptions -> frameOptions.disable()))
+                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+        return http.build();
+    }
+
+    /**
      * Настройка цепочки фильтров безопасности
      * Security filter chain configuration
      *
      * - Отключаем CSRF (для REST API используется JWT) / Disable CSRF (JWT for REST API)
      * - Настраиваем CORS для мобильного приложения / Configure CORS for mobile app
-     * - Отключаем X-Frame-Options для H2 консоли / Disable X-Frame-Options for H2 console
      * - Делаем сессии stateless (без сессий на сервере) / Stateless sessions (no server sessions)
-     * - Открываем доступ для эндпоинтов авторизации, WebSocket и H2 консоли / Open access for auth, WebSocket and H2 endpoints
+     * - Открываем доступ для эндпоинтов авторизации и WebSocket / Open access for auth and WebSocket endpoints
      * - Все остальные запросы требуют аутентификации через JWT / All other requests require JWT authentication
      */
     @Bean
+    @Order(2)
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())                              // Отключаем CSRF (для REST API) / Disable CSRF for REST API
-                .headers(headers -> headers.frameOptions(frameOptions -> frameOptions.disable())) // Для H2
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS) // Без сессий (используем JWT) / Stateless (using JWT)
                 )
@@ -76,8 +97,8 @@ public class SecurityConfig {
                         .requestMatchers("/ws/**", "/ws").permitAll()
                         // Swagger UI (если добавим позже) / Swagger UI (if added later)
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
-                        // База данных - H2 консоль / Database - H2 console
-                        .requestMatchers("/h2-console/**").permitAll()
+                        // H2-консоль обслуживается отдельной цепочкой h2ConsoleFilterChain выше
+                        // The H2 console is served by the separate h2ConsoleFilterChain above
                         // /auth/fcm-token не должен быть публичным эндпоинтом — ему нужна авторизация, чтобы знать, чей токен обновлять / It shouldn't be a public endpoint—it requires authorization to know whose token to refresh
                         .requestMatchers("/api/auth/fcm-token", "/api/auth/me").authenticated()
                         // Все остальные запросы требуют авторизации / All other requests require authentication

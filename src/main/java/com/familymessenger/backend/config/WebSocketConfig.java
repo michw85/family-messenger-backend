@@ -1,6 +1,7 @@
 package com.familymessenger.backend.config;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
@@ -19,6 +20,15 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private final WebSocketAuthenticationInterceptor authenticationInterceptor;
 
+    // Тот же список доверенных доменов, что и у обычного REST CORS (app.cors.allowed-origins) -
+    // раньше здесь было "*", что расширяло анонимное прослушивание чужих чатов (см.
+    // WebSocketAuthenticationInterceptor) ещё и на браузерных/веб-клиентов с любого домена
+    // Same trusted-domain list as regular REST CORS (app.cors.allowed-origins) - this used
+    // to be "*", which widened the anonymous chat-eavesdropping issue (see
+    // WebSocketAuthenticationInterceptor) to browser/web clients from any domain too
+    @Value("${app.cors.allowed-origins}")
+    private String allowedOrigins;
+
     /**
      * Регистрация WebSocket endpoint'а (точки подключения)
      * Register WebSocket endpoint (connection point)
@@ -31,7 +41,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         // Add /ws endpoint for client connections
         System.out.println("🔌 Registering WebSocket endpoint /ws");
         registry.addEndpoint("/ws")
-                .setAllowedOriginPatterns("*")  // Разрешаем подключения с любых доменов (для разработки)
+                .setAllowedOrigins(allowedOrigins.split(","))
                 .withSockJS()                   // Включаем SockJS (fallback для браузеров без WebSocket)
                 .setClientLibraryUrl("https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js");
     }

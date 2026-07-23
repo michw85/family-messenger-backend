@@ -118,8 +118,12 @@ public class UserService {
      * @return список пользователей / list of users
      */
     public List<User> searchUsers(String query, Long currentUserId) {
-        if (query == null || query.trim().isEmpty()) {
-            return List.of(); // пустой список, если запрос пуст / empty list if query is empty
+        // Минимум 2 символа - и для юзабельности (короче не имеет смысла), и чтобы
+        // усложнить перебор всей базы пользователей по одному символу за раз
+        // At least 2 characters - both for usability (shorter isn't meaningful) and to
+        // make it harder to enumerate the whole user base one character at a time
+        if (query == null || query.trim().length() < 2) {
+            return List.of();
         }
         return userRepository.searchUsers(query, currentUserId);
     }

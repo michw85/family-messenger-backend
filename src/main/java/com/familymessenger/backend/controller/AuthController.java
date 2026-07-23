@@ -11,9 +11,11 @@ import com.familymessenger.backend.security.JwtTokenProvider;
 import com.familymessenger.backend.security.LoginAttemptService;
 import com.familymessenger.backend.security.OtpService;
 import com.familymessenger.backend.security.PasswordResetService;
+import com.familymessenger.backend.security.RateLimiterService;
 import com.familymessenger.backend.security.RefreshTokenService;
 import com.familymessenger.backend.service.EmailService;
 import com.familymessenger.backend.service.UserService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +26,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.web.bind.annotation.*;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
+import java.time.Duration;
 import java.util.Map;
 
 /**
@@ -45,6 +48,19 @@ public class AuthController {
     private final OtpService otpService;
     private final EmailService emailService;
     private final PasswordResetService passwordResetService;
+    private final RateLimiterService rateLimiterService;
+
+    /**
+     * IP клиента с учётом обратного прокси (nginx перед бэкендом на droplet'е)
+     * Client IP, accounting for the reverse proxy (nginx in front of the backend on the droplet)
+     */
+    private String clientIp(HttpServletRequest request) {
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank()) {
+            return forwarded.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
+    }
 
     /**
      * Регистрация нового пользователя
@@ -54,9 +70,19 @@ public class AuthController {
      * @return токен и данные пользователя / token and user data
      */
     @PostMapping("/register")
-    public ResponseEntity<?> register(@Valid @RequestBody AuthRequest request) {
+    public ResponseEntity<?> register(@Valid @RequestBody AuthRequest request, HttpServletRequest httpRequest) {
 
         log.info("Registering new user with username: {}", request.getUsername());
+
+        // Ограничение по IP - без него эндпоинт можно скриптово забить фейковыми аккаунтами
+        // Rate-limit by IP - without this the endpoint could be scripted to mass-create fake accounts
+        String ip = clientIp(httpRequest);
+        if (!rateLimiterService.tryAcquire("register:ip:" + ip, 5, Duration.ofHours(1))) {
+            log.warn("Rate limit exceeded for registration from IP: {}", ip);
+            return ResponseEntity
+                    .status(HttpStatus.TOO_MANY_REQUESTS)
+                    .body("Too many registration attempts. Try again later / Слишком много попыток регистрации. Попробуйте позже");
+        }
 
         // Проверяем, существует ли пользователь с таким username
         // Check if user with this username already exists
@@ -290,12 +316,36 @@ public class AuthController {
      * @param request - тело запроса с полем email / request body with an email field
      */
     @PostMapping("/forgot-password")
-    public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> request) {
+    public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> request, HttpServletRequest httpRequest) {
         String email = request.get("email");
         if (email == null || email.isBlank()) {
             return ResponseEntity.badRequest().body("email is required / email обязателен");
         }
 
+        // Ограничение и по email (не заспамить письмами один и тот же ящик), и по IP
+        // (не заспамить много разных ящиков с одного источника). При превышении лимита
+        // отвечаем тем же самым generic-сообщением, что и в обычном случае - иначе сам факт
+        // срабатывания лимита мог бы стать ещё одним каналом для user enumeration.
+        // Rate-limited both by email (don't spam the same inbox) and by IP (don't spam many
+        // different inboxes from one source). On limit exceeded we return the exact same
+        // generic message as the normal case - otherwise hitting the limit itself could become
+        // another user-enumeration side channel.
+        String ip = clientIp(httpRequest);
+        boolean ipOk = rateLimiterService.tryAcquire("forgot-password:ip:" + ip, 10, Duration.ofHours(1));
+        boolean emailOk = rateLimiterService.tryAcquire("forgot-password:email:" + email.toLowerCase(), 3, Duration.ofHours(1));
+
+        if (ipOk && emailOk) {
+            sendPasswordResetIfRegistered(email);
+        } else {
+            log.warn("Rate limit exceeded for forgot-password (ip={}, email={})", ip, email);
+        }
+
+        return ResponseEntity.ok(Map.of(
+                "message", "If this email is registered, a reset code has been sent / Если этот email зарегистрирован, на него отправлен код"
+        ));
+    }
+
+    private void sendPasswordResetIfRegistered(String email) {
         userService.findByEmail(email).ifPresent(user -> {
             try {
                 String code = passwordResetService.generateAndStore(email);
@@ -305,10 +355,6 @@ public class AuthController {
                 log.error("Failed to send password reset email for: {}", email, e);
             }
         });
-
-        return ResponseEntity.ok(Map.of(
-                "message", "If this email is registered, a reset code has been sent / Если этот email зарегистрирован, на него отправлен код"
-        ));
     }
 
     /**
