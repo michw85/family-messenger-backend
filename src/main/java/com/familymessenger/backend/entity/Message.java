@@ -43,6 +43,15 @@ public class Message {
 
     private LocalDateTime timestamp;
 
+    /**
+     * Если задано - это "капсула времени": содержимое (и медиа) скрыто от
+     * ВСЕХ, включая отправителя, до этого момента - see ChatMessageDto.fromEntity.
+     * If set, this is a "time capsule": the content (and media) is hidden
+     * from EVERYONE, including the sender, until this moment - see
+     * ChatMessageDto.fromEntity.
+     */
+    private LocalDateTime revealAt;
+
     // columnDefinition даёт Hibernate указание на DEFAULT при авто-миграции схемы,
     // иначе ALTER TABLE ADD COLUMN NOT NULL падает на таблице с существующими строками
     // columnDefinition tells Hibernate to add a DEFAULT during schema auto-migration,

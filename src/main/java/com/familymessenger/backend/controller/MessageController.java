@@ -95,7 +95,8 @@ public class MessageController {
                 sender,
                chatMessageDto.getType() != null ? chatMessageDto.getType() : Message.MessageType.TEXT,
                 chatMessageDto.getMediaUrl(),
-                chatMessageDto.getReplyToId()
+                chatMessageDto.getReplyToId(),
+                chatMessageDto.getRevealAt()
         );
 
         // Отправить уведомления участникам

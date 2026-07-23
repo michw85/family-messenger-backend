@@ -51,7 +51,7 @@ public class ChatService {
      * Save message in chat room
      */
     @Transactional
-    public Message saveMessage(String content, String roomId, User sender, Message.MessageType type, String mediaUrl, String replyToId) {
+    public Message saveMessage(String content, String roomId, User sender, Message.MessageType type, String mediaUrl, String replyToId, LocalDateTime revealAt) {
 
         log.debug("Saving message from {} in room {}", sender.getUsername(), roomId);
 
@@ -71,6 +71,7 @@ public class ChatService {
         message.setSender(sender);
         message.setType(type != null ? type : Message.MessageType.TEXT);
         message.setMediaUrl(mediaUrl);
+        message.setRevealAt(revealAt);
 
         // Если это ответ - находим оригинал, но только если он из того же чата
         // If this is a reply - look up the original, but only if it's from the same chat

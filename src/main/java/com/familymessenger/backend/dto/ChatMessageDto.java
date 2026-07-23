@@ -36,6 +36,16 @@ public class ChatMessageDto {
     @Builder.Default
     private java.util.List<ReactionSummaryDto> reactions = java.util.List.of(); // Реакции на сообщение (вычисляются отдельно) /
                                      // Reactions on the message (computed separately)
+    private LocalDateTime revealAt; // Если задано - это капсула времени, откроется в этот момент /
+                                     // If set, this is a time capsule that opens at this moment
+
+    /**
+     * Правда ли, что содержимое ещё скрыто (капсула времени, момент раскрытия не наступил)
+     * Whether the content is still hidden (time capsule, reveal moment hasn't arrived yet)
+     */
+    private static boolean isHidden(Message message) {
+        return message.getRevealAt() != null && message.getRevealAt().isAfter(LocalDateTime.now());
+    }
 
     /**
      * Конвертация из Entity в DTO
@@ -44,18 +54,21 @@ public class ChatMessageDto {
     public static ChatMessageDto fromEntity(Message message) {
         if (message == null) return null;
 
+        boolean hidden = isHidden(message);
+
         return ChatMessageDto.builder()
                 .id(message.getId())
                 .chatRoomId(message.getChatRoom() != null ? message.getChatRoom().getId() : null)
                 .sender(message.getSender() != null ? UserDto.fromEntity(message.getSender()) : null)
-                .content(message.getContent())
+                .content(hidden ? "🎁 Капсула времени - откроется " + message.getRevealAt() : message.getContent())
                 .type(message.getType())
-                .mediaUrl(message.getMediaUrl())
+                .mediaUrl(hidden ? null : message.getMediaUrl())
                 .timestamp(message.getTimestamp())
                 .replyToId(message.getReplyTo() != null ? message.getReplyTo().getId() : null)
                 .replyTo(ReplyPreviewDto.fromEntity(message.getReplyTo()))
                 .edited(message.isEdited())
                 .deleted(message.isDeleted())
+                .revealAt(message.getRevealAt())
                 .build();
     }
 }
