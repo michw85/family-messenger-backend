@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.PageRequest;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
@@ -520,6 +521,19 @@ public class ChatService {
     public ChatRoom getChatRoomById(String chatId) {
         return chatRoomRepository.findById(chatId)
                 .orElseThrow(() -> new RuntimeException("Chat room not found"));
+    }
+
+    /**
+     * "Лента памяти": сообщения из этого чата, отправленные в этот же день в
+     * прошлые годы ("год назад в этот день")
+     * "Memory lane": messages from this chat sent on this same day in past
+     * years ("a year ago today")
+     */
+    @Transactional(readOnly = true)
+    public List<Message> getMemories(String chatId) {
+        ChatRoom chatRoom = getChatRoomById(chatId);
+        LocalDate today = LocalDate.now();
+        return messageRepository.findOnThisDayInPast(chatRoom, today.getMonthValue(), today.getDayOfMonth(), today.getYear());
     }
 
     @Transactional

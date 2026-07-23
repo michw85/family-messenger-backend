@@ -29,4 +29,21 @@ public interface MessageRepository extends JpaRepository<Message, String> {
 
     @Query("SELECT COUNT(m) FROM Message m WHERE m.chatRoom = :chatRoom AND m.timestamp > :since")
     long countNewMessages(@Param("chatRoom") ChatRoom chatRoom, @Param("since") LocalDateTime since);
+
+    /**
+     * Сообщения из этого чата, отправленные в этот же день (число+месяц) в прошлые годы
+     * ("лента памяти") - не считая сегодняшний год и удалённые сообщения
+     * Messages from this chat sent on this same day (day+month) in past years
+     * ("memory lane") - excluding this year and deleted messages
+     */
+    @Query("SELECT m FROM Message m WHERE m.chatRoom = :chatRoom " +
+            "AND EXTRACT(MONTH FROM m.timestamp) = :month " +
+            "AND EXTRACT(DAY FROM m.timestamp) = :day " +
+            "AND EXTRACT(YEAR FROM m.timestamp) < :currentYear " +
+            "AND m.deleted = false " +
+            "ORDER BY m.timestamp DESC")
+    List<Message> findOnThisDayInPast(@Param("chatRoom") ChatRoom chatRoom,
+                                       @Param("month") int month,
+                                       @Param("day") int day,
+                                       @Param("currentYear") int currentYear);
 }

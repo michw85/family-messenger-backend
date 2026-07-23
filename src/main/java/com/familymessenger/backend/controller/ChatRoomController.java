@@ -102,6 +102,33 @@ public class ChatRoomController {
     }
 
     /**
+     * "Лента памяти": сообщения из этого чата, отправленные в этот же день в прошлые годы
+     * "Memory lane": messages from this chat sent on this same day in past years
+     *
+     * @param chatId ID чата / chat ID
+     * @param user   текущий пользователь / current user
+     */
+    @GetMapping("/{chatId}/memories")
+    public ResponseEntity<?> getMemories(@PathVariable String chatId,
+                                         @AuthenticationPrincipal User user) {
+        if (!chatService.isParticipant(chatId, user.getId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("Not a participant of this chat / Вы не участник этого чата");
+        }
+
+        ChatRoom chatRoom = chatService.getChatRoomById(chatId);
+        List<Message> memories = chatService.getMemories(chatId);
+        List<ChatMessageDto> dtos = memories.stream()
+                .map(m -> {
+                    ChatMessageDto dto = ChatMessageDto.fromEntity(m);
+                    dto.setReactions(chatService.getReactionSummary(m));
+                    return dto;
+                })
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(dtos);
+    }
+
+    /**
      * Поставить/снять/заменить реакцию на сообщение (рассылается по WebSocket всем в чате)
      * Toggle a reaction on a message (broadcast over WebSocket to everyone in the chat)
      *
