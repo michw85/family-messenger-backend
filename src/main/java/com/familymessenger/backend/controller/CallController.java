@@ -12,6 +12,7 @@ import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.security.Principal;
 import java.util.Map;
@@ -33,6 +34,15 @@ public class CallController {
     private final SimpMessagingTemplate messagingTemplate;
     private final FcmService fcmService;
 
+    // STOMP-сообщения (в отличие от обычных REST-запросов) не проходят через
+    // open-session-in-view - без своей транзакции лениво загружаемая (по
+    // умолчанию для @ManyToMany) коллекция participants недоступна к моменту
+    // обращения к ней ниже.
+    // STOMP messages (unlike regular REST requests) don't go through
+    // open-session-in-view - without its own transaction, the lazily-loaded
+    // (the @ManyToMany default) participants collection isn't available by
+    // the time it's accessed below.
+    @Transactional
     @MessageMapping("/call.signal/{roomId}")
     public void relaySignal(@Payload CallSignalDto signal,
                              @DestinationVariable String roomId,
@@ -50,6 +60,9 @@ public class CallController {
         if (room.getType() != ChatRoom.RoomType.DIRECT) {
             throw new IllegalStateException("Calls are only supported in 1:1 (DIRECT) chats");
         }
+
+        log.info("Room {} has {} participants: {}", roomId, room.getParticipants().size(),
+                room.getParticipants().stream().map(User::getUsername).toList());
 
         User other = room.getParticipants().stream()
                 .filter(p -> !p.getId().equals(sender.getId()))
