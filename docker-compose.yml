@@ -55,6 +55,7 @@ services:
       - GMAIL_SENDER_EMAIL=${GMAIL_SENDER_EMAIL:-bonds.app.dev@gmail.com}
       - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-https://bonds-app.duckdns.org}
       - FIREBASE_CREDENTIALS_PATH=/run/secrets/firebase-credentials.json
+      - TURN_SECRET=${TURN_SECRET:?TURN_SECRET is required}
     volumes:
       # Файл ключа сервис-аккаунта Firebase лежит на хосте ВНЕ репозитория
       # (например /root/secrets/firebase-credentials.json) и монтируется сюда
@@ -69,6 +70,34 @@ services:
       - minio
     networks:
       - messenger-network
+    restart: unless-stopped
+
+  # TURN/STUN сервер для WebRTC-звонков - самостоятельный, без сторонних служб.
+  # network_mode: host нужен из-за широкого диапазона UDP-портов для relay
+  # (49152-65535) - публиковать каждый порт через docker-proxy дорого/ненадёжно,
+  # это собственная рекомендация coturn для такого диапазона. TURN/STUN не идёт
+  # через HTTP-реверс-прокси (тот, что стоит перед backend), поэтому портам
+  # нужен отдельный доступ - см. чек-лист файрвола дроплета в плане.
+  # TURN/STUN server for WebRTC calls - self-hosted, no third-party service.
+  # network_mode: host is needed because of the wide UDP relay port range
+  # (49152-65535) - publishing each port through docker-proxy is expensive/
+  # unreliable, this is coturn's own recommendation for such a range. TURN/STUN
+  # doesn't go through the HTTP reverse proxy in front of backend, so these
+  # ports need separate access - see the droplet firewall checklist in the plan.
+  coturn:
+    image: coturn/coturn:latest
+    container_name: family-messenger-coturn
+    network_mode: host
+    environment:
+      - TURN_SECRET=${TURN_SECRET:?TURN_SECRET is required}
+    command: >
+      turnserver
+      --listening-port=3478
+      --min-port=49152 --max-port=65535
+      --use-auth-secret --static-auth-secret=${TURN_SECRET}
+      --realm=bonds-app.duckdns.org
+      --no-cli --no-tls --no-dtls
+      --log-file=stdout
     restart: unless-stopped
 
 volumes:

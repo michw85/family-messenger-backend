@@ -68,6 +68,7 @@ public class Message {
     }
 
     public enum MessageType {
-        TEXT, IMAGE, VOICE, VIDEO, FILE, MOOD_CHECKIN
+        TEXT, IMAGE, VOICE, VIDEO, FILE, MOOD_CHECKIN,
+        CALL_MISSED, CALL_DECLINED, CALL_ANSWERED, CALL_CANCELLED
     }
 }
