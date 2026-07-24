@@ -60,7 +60,11 @@ public class ChatMessageDto {
                 .id(message.getId())
                 .chatRoomId(message.getChatRoom() != null ? message.getChatRoom().getId() : null)
                 .sender(message.getSender() != null ? UserDto.fromEntity(message.getSender()) : null)
-                .content(hidden ? "🎁 Капсула времени - откроется " + message.getRevealAt() : message.getContent())
+                // Пока капсула запечатана, контент не отправляется вовсе - клиент сам
+                // строит локализованную заглушку из revealAt на своём языке интерфейса
+                // While the capsule is sealed, no content is sent at all - the client
+                // builds the localized placeholder from revealAt in its own UI language
+                .content(hidden ? null : message.getContent())
                 .type(message.getType())
                 .mediaUrl(hidden ? null : message.getMediaUrl())
                 .timestamp(message.getTimestamp())
