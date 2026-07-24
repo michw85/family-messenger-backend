@@ -11,5 +11,5 @@ public class CreateChatRequest {
     private String name;
 
     @NotNull(message = "Chat type is required")
-    private ChatRoom.RoomType type;   // GROUP, FAMILY
+    private ChatRoom.RoomType type;   // GROUP or DIRECT (client-created personal chats)
 }
