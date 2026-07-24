@@ -61,6 +61,8 @@ public class CallController {
         signal.setFromUsername(sender.getUsername());
         signal.setTimestamp(System.currentTimeMillis());
 
+        log.info("Relaying call signal {} from {} to {} (room {})",
+                signal.getType(), sender.getUsername(), other.getUsername(), roomId);
         messagingTemplate.convertAndSendToUser(other.getUsername(), "/queue/call", signal);
 
         // Пуш только при OFFER, покрывает случай, когда собеседник свёрнул/закрыл
