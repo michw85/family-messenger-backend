@@ -90,11 +90,30 @@ services:
     network_mode: host
     environment:
       - TURN_SECRET=${TURN_SECRET:?TURN_SECRET is required}
+    # Без --external-ip coturn с network_mode: host сам обнаруживает ВСЕ
+    # локальные адреса (публичный, приватную VPC-сеть DO, docker-бридж-адреса
+    # 172.17/18.0.1...) и вправе выдать relay-кандидата на любом из них.
+    # Кандидат на приватном/докеровском адресе недостижим для собеседника
+    # снаружи - ICE зависает на "checking" и звонок остаётся без звука/видео.
+    # Пришлось на практике: после рестарта контейнера (docker-compose down/up
+    # при обычном деплое) звонок дошёл до answer/ontrack, но так и не
+    # законнектился - в логах coturn "Total: 6 relay addresses discovered"
+    # включая 10.x/172.17-18.0.1.
+    # Without --external-ip, coturn on network_mode: host auto-discovers ALL
+    # local addresses (the public IP, DO's private VPC network, docker bridge
+    # addresses 172.17/18.0.1...) and is free to hand out a relay candidate on
+    # any of them. A candidate on a private/docker address is unreachable from
+    # outside - ICE gets stuck at "checking" and the call has no audio/video.
+    # Hit this in practice: after a container restart (docker-compose down/up
+    # on a routine deploy), a call reached answer/ontrack but never connected -
+    # coturn's own logs showed "Total: 6 relay addresses discovered" including
+    # 10.x/172.17-18.0.1.
     command: >
       turnserver
       --listening-port=3478
       --min-port=49152 --max-port=65535
       --use-auth-secret --static-auth-secret=${TURN_SECRET}
+      --external-ip=${TURN_EXTERNAL_IP:-165.245.213.90}
       --realm=bonds-app.duckdns.org
       --no-cli --no-tls --no-dtls
       --log-file=stdout
