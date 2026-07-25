@@ -556,6 +556,35 @@ public class ChatService {
     }
 
     /**
+     * Переименовать чат - доступно любому участнику (личный чат в этом
+     * приложении хранит одно общее название на обоих участников, а не
+     * персональный псевдоним каждого, как в некоторых мессенджерах - см.
+     * ChatRoom.name), не только создателю, в отличие от полного удаления.
+     * Rename a chat - available to any participant (a personal chat in this
+     * app stores one shared name for both participants, not a per-user
+     * nickname like in some messengers - see ChatRoom.name), not just the
+     * creator, unlike full deletion.
+     */
+    public ChatRoom renameChat(String chatId, String newName, Long userId) {
+        ChatRoom chatRoom = chatRoomRepository.findById(chatId)
+                .orElseThrow(() -> new RuntimeException("Chat room not found"));
+
+        boolean isParticipant = chatRoom.getParticipants().stream()
+                .anyMatch(u -> u.getId().equals(userId));
+        if (!isParticipant) {
+            throw new RuntimeException("Not a participant of this chat");
+        }
+
+        String trimmed = newName == null ? "" : newName.trim();
+        if (trimmed.isEmpty()) {
+            throw new RuntimeException("Chat name cannot be empty");
+        }
+
+        chatRoom.setName(trimmed);
+        return chatRoomRepository.save(chatRoom);
+    }
+
+    /**
      * Поставить/снять/заменить реакцию текущего пользователя на сообщение.
      * Повторный выбор той же эмодзи снимает реакцию, выбор другой - заменяет.
      * Toggle the current user's reaction on a message. Picking the same

@@ -346,6 +346,28 @@ public class ChatRoomController {
     }
 
     /**
+     * Переименовать чат
+     * Rename a chat
+     *
+     * @param chatId  ID чата / chat ID
+     * @param request тело запроса с полем name / request body with a name field
+     * @param user    текущий пользователь / current user
+     */
+    @PatchMapping("/{chatId}/name")
+    public ResponseEntity<?> renameChat(@PathVariable String chatId,
+                                        @RequestBody Map<String, String> request,
+                                        @AuthenticationPrincipal User user) {
+        log.info("Renaming chat {} by user: {}", chatId, user.getUsername());
+
+        try {
+            ChatRoom updated = chatService.renameChat(chatId, request.get("name"), user.getId());
+            return ResponseEntity.ok(ChatRoomDto.fromEntity(updated));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        }
+    }
+
+    /**
      * Получить участников чата
      * Get chat participants
      *
