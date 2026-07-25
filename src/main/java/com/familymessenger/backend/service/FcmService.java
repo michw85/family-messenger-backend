@@ -41,6 +41,15 @@ public class FcmService {
             payload.put("body", body);
             payload.put("sound", "default");
             payload.put("priority", "high");
+            // Должен совпадать с id канала, создаваемого в
+            // notifications.ts::registerForPushNotificationsAsync - без этого
+            // Expo целится в канал с буквальным именем "default", а не в тот,
+            // что реально зарегистрирован на устройстве.
+            // Must match the channel id created in
+            // notifications.ts::registerForPushNotificationsAsync - without
+            // this Expo targets a channel literally named "default" instead
+            // of the one actually registered on the device.
+            payload.put("channelId", "default-v2");
             if (data != null && !data.isEmpty()) {
                 payload.put("data", data);
             }
