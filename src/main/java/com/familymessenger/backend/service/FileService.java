@@ -40,6 +40,9 @@ public class FileService {
     private static final int MAX_IMAGE_DIMENSION = 1600;
     // Качество JPEG после пережатия (0.0-1.0)
     private static final float IMAGE_OUTPUT_QUALITY = 0.82f;
+    // Префикс, под которым публично отдаются файлы - используется и для построения
+    // ссылки при загрузке, и для восстановления object key при удалении
+    private static final String MEDIA_URL_PREFIX = "https://bonds-app.duckdns.org/media/";
 
     /**
      * Загрузка файла в MinIO
@@ -116,7 +119,7 @@ public class FileService {
         // Build URL for file access
 //        String fileUrl = String.format("%s/%s/%s", minioUrl, bucketName, filename);
 //        String fileUrl = String.format("http://165.245.213.90:9000/%s/%s", bucketName, filename);
-        String fileUrl = String.format("https://bonds-app.duckdns.org/media/%s", filename);
+        String fileUrl = MEDIA_URL_PREFIX + filename;
         log.info("File uploaded successfully: {}", fileUrl);
 
         return fileUrl;
@@ -184,6 +187,25 @@ public class FileService {
 
             return inputStream.readAllBytes();
         }
+    }
+
+    /**
+     * Удаление файла из MinIO по его публичной ссылке (см. MEDIA_URL_PREFIX) -
+     * используется MediaRetentionService для стирания просроченных VIDEO/FILE
+     * Removes a file from MinIO by its public URL (see MEDIA_URL_PREFIX) -
+     * used by MediaRetentionService to erase expired VIDEO/FILE attachments
+     */
+    public void deleteFile(String mediaUrl) throws Exception {
+        if (mediaUrl == null || !mediaUrl.startsWith(MEDIA_URL_PREFIX)) {
+            throw new IllegalArgumentException("Unrecognized media URL, cannot resolve object key: " + mediaUrl);
+        }
+        String objectKey = mediaUrl.substring(MEDIA_URL_PREFIX.length());
+        log.info("Deleting expired file from MinIO: {}", objectKey);
+        minioClient.removeObject(
+                RemoveObjectArgs.builder()
+                        .bucket(bucketName)
+                        .object(objectKey)
+                        .build());
     }
 
     /**

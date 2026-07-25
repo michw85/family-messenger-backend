@@ -46,4 +46,14 @@ public interface MessageRepository extends JpaRepository<Message, String> {
                                        @Param("month") int month,
                                        @Param("day") int day,
                                        @Param("currentYear") int currentYear);
+
+    /**
+     * Сообщения VIDEO/FILE, срок хранения которых истёк, а файл ещё не удалён -
+     * см. MediaRetentionService
+     * VIDEO/FILE messages whose retention window has passed and the file
+     * hasn't been removed yet - see MediaRetentionService
+     */
+    @Query("SELECT m FROM Message m WHERE m.mediaExpiresAt IS NOT NULL " +
+            "AND m.mediaExpiresAt < :cutoff AND m.mediaDeletedFromStorage = false")
+    List<Message> findExpiredMedia(@Param("cutoff") LocalDateTime cutoff);
 }

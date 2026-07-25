@@ -52,6 +52,16 @@ public class Message {
      */
     private LocalDateTime revealAt;
 
+    /**
+     * Для VIDEO/FILE - момент, когда сам файл (не сообщение) должен быть
+     * удалён с сервера планировщиком, см. MediaRetentionService. Null для
+     * остальных типов - фото/голосовые не удаляются.
+     * For VIDEO/FILE - when the file itself (not the message) should be
+     * removed from storage by the scheduler, see MediaRetentionService.
+     * Null for other types - photos/voice messages are never auto-deleted.
+     */
+    private LocalDateTime mediaExpiresAt;
+
     // columnDefinition даёт Hibernate указание на DEFAULT при авто-миграции схемы,
     // иначе ALTER TABLE ADD COLUMN NOT NULL падает на таблице с существующими строками
     // columnDefinition tells Hibernate to add a DEFAULT during schema auto-migration,
@@ -62,9 +72,23 @@ public class Message {
     @Column(nullable = false, columnDefinition = "boolean default false")
     private boolean deleted = false;
 
+    /**
+     * true, как только планировщик реально удалил файл из MinIO - отдельно
+     * от mediaExpiresAt, чтобы не пытаться повторно удалить уже удалённый
+     * объект и не спорить с часовой арифметикой при чтении.
+     * true once the scheduler has actually removed the file from MinIO -
+     * kept separate from mediaExpiresAt so we don't retry removing an
+     * already-gone object or rely purely on clock math when reading.
+     */
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    private boolean mediaDeletedFromStorage = false;
+
     @PrePersist
     protected void onCreate() {
         timestamp = LocalDateTime.now();
+        if ((type == MessageType.VIDEO || type == MessageType.FILE) && mediaUrl != null) {
+            mediaExpiresAt = timestamp.plusDays(30);
+        }
     }
 
     public enum MessageType {

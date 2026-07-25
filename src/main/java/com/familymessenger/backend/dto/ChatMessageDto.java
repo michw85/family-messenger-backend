@@ -38,6 +38,10 @@ public class ChatMessageDto {
                                      // Reactions on the message (computed separately)
     private LocalDateTime revealAt; // Если задано - это капсула времени, откроется в этот момент /
                                      // If set, this is a time capsule that opens at this moment
+    private LocalDateTime mediaExpiresAt; // Для VIDEO/FILE - когда файл будет/был удалён с сервера /
+                                     // For VIDEO/FILE - when the file will be/was removed from storage
+    private boolean mediaExpired;   // Файл уже удалён с сервера (место занял слишком долго) /
+                                     // The file has already been removed from storage (occupied space too long)
 
     /**
      * Правда ли, что содержимое ещё скрыто (капсула времени, момент раскрытия не наступил)
@@ -48,6 +52,19 @@ public class ChatMessageDto {
     }
 
     /**
+     * Правда ли, что файл (VIDEO/FILE) уже удалён или должен считаться удалённым -
+     * либо планировщик его уже реально стёр, либо срок истёк, а плановая задача
+     * ещё не успела прогнаться (не показываем битую ссылку в этом окне).
+     * Whether the file (VIDEO/FILE) is already gone or should be treated as gone -
+     * either the scheduler already removed it, or the deadline passed and the
+     * scheduled job hasn't run yet (avoid showing a broken link in that window).
+     */
+    private static boolean isMediaExpired(Message message) {
+        return message.isMediaDeletedFromStorage()
+                || (message.getMediaExpiresAt() != null && message.getMediaExpiresAt().isBefore(LocalDateTime.now()));
+    }
+
+    /**
      * Конвертация из Entity в DTO
      * Convert Entity to DTO
      */
@@ -55,6 +72,7 @@ public class ChatMessageDto {
         if (message == null) return null;
 
         boolean hidden = isHidden(message);
+        boolean mediaExpired = isMediaExpired(message);
 
         return ChatMessageDto.builder()
                 .id(message.getId())
@@ -66,13 +84,15 @@ public class ChatMessageDto {
                 // builds the localized placeholder from revealAt in its own UI language
                 .content(hidden ? null : message.getContent())
                 .type(message.getType())
-                .mediaUrl(hidden ? null : message.getMediaUrl())
+                .mediaUrl(hidden || mediaExpired ? null : message.getMediaUrl())
                 .timestamp(message.getTimestamp())
                 .replyToId(message.getReplyTo() != null ? message.getReplyTo().getId() : null)
                 .replyTo(ReplyPreviewDto.fromEntity(message.getReplyTo()))
                 .edited(message.isEdited())
                 .deleted(message.isDeleted())
                 .revealAt(message.getRevealAt())
+                .mediaExpiresAt(message.getMediaExpiresAt())
+                .mediaExpired(mediaExpired)
                 .build();
     }
 }
