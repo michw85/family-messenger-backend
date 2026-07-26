@@ -36,6 +36,18 @@ public class ChatService {
     private final MessageReactionRepository messageReactionRepository;
 
     /**
+     * Служебное имя блокнот-чата - должно совпадать с NOTEBOOK_MARKER в
+     * family-messenger-mobile/src/utils/notebook.ts. Используется, чтобы
+     * запретить обычным пользователям безвозвратно удалять свой блокнот -
+     * см. deleteChat/leaveChat ниже.
+     * The notebook chat's internal name - must match NOTEBOOK_MARKER in
+     * family-messenger-mobile/src/utils/notebook.ts. Used to stop regular
+     * users from permanently deleting their own notebook - see
+     * deleteChat/leaveChat below.
+     */
+    private static final String NOTEBOOK_MARKER = "__notebook__";
+
+    /**
      * Получение пользователя по username
      * Get user by username
      */
@@ -220,16 +232,32 @@ public class ChatService {
     }
 
     /**
-     * Удалить чат, если пользователь является создателем
-     * Delete chat if user is creator
+     * Удалить чат целиком - создатель, админ группы или суперадмин.
+     * Блокнот (личный чат-заметка) - исключение: его может удалить навсегда
+     * только суперадмин, даже если запрос идёт от самого владельца блокнота -
+     * обычным пользователям доступно только "скрыть" через leaveChat.
+     * Delete a chat entirely - the creator, a group admin, or a superadmin.
+     * The notebook (personal note-to-self chat) is an exception: only a
+     * superadmin can permanently delete it, even for the notebook's own
+     * owner - regular users only get "hide" via leaveChat.
      */
     @Transactional
     public void deleteChat(String chatId, Long userId) {
         ChatRoom chatRoom = chatRoomRepository.findById(chatId)
                 .orElseThrow(() -> new RuntimeException("Chat not found"));
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
 
-        if (!chatRoom.getCreatedBy().getId().equals(userId)) {
-            throw new RuntimeException("Only creator can delete chat");
+        if (NOTEBOOK_MARKER.equals(chatRoom.getName())) {
+            if (!user.isSuperadmin()) {
+                throw new RuntimeException("Only a superadmin can permanently delete a notebook");
+            }
+        } else {
+            boolean isCreator = chatRoom.getCreatedBy().getId().equals(userId);
+            boolean isGroupAdmin = chatRoom.getGroupAdminUserIds().contains(userId);
+            if (!isCreator && !isGroupAdmin && !user.isSuperadmin()) {
+                throw new RuntimeException("Only the creator, a group admin, or a superadmin can delete this chat");
+            }
         }
 
         deleteRoomAndMessages(chatRoom);
@@ -300,12 +328,18 @@ public class ChatService {
         ChatRoom chatRoom = chatRoomRepository.findById(chatId)
                 .orElseThrow(() -> new RuntimeException("Chat room not found"));
 
-        // Только создатель или сам участник может удалить / Only creator or the participant can remove
+        // Создатель/админ группы/редактор могут кикнуть кого угодно, суперадмин - тоже;
+        // сам участник всегда может убрать себя / The creator/group admin/editor can
+        // kick anyone, so can a superadmin; a participant can always remove themself
         boolean isCreator = chatRoom.getCreatedBy().getId().equals(currentUserId);
         boolean isSelf = userId.equals(currentUserId);
+        boolean isGroupAdmin = chatRoom.getGroupAdminUserIds().contains(currentUserId);
+        boolean isEditor = chatRoom.getEditorUserIds().contains(currentUserId);
+        boolean isSuperadmin = userRepository.findById(currentUserId)
+                .map(User::isSuperadmin).orElse(false);
 
-        if (!isCreator && !isSelf) {
-            throw new RuntimeException("Only creator or the participant can remove themself");
+        if (!isCreator && !isSelf && !isGroupAdmin && !isEditor && !isSuperadmin) {
+            throw new RuntimeException("Only the creator, a group admin/editor, a superadmin, or the participant themself can remove them");
         }
 
         User userToRemove = userRepository.findById(userId)
@@ -313,6 +347,120 @@ public class ChatService {
 
         chatRoom.getParticipants().remove(userToRemove);
         chatRoomRepository.save(chatRoom);
+    }
+
+    /**
+     * Проверяет, что вызывающий - создатель группы или суперадмин (право
+     * назначать/снимать админов группы).
+     * Checks the caller is the group's creator or a superadmin (the
+     * permission needed to promote/demote group admins).
+     */
+    private void requireCreatorOrSuperadmin(ChatRoom chatRoom, Long callerId) {
+        boolean isCreator = chatRoom.getCreatedBy().getId().equals(callerId);
+        boolean isSuperadmin = userRepository.findById(callerId).map(User::isSuperadmin).orElse(false);
+        if (!isCreator && !isSuperadmin) {
+            throw new RuntimeException("Only the creator or a superadmin can manage group admins");
+        }
+    }
+
+    /**
+     * Назначить участника админом группы - может создатель группы или суперадмин.
+     * Promote a participant to group admin - only the group's creator or a superadmin.
+     */
+    @Transactional
+    public void promoteGroupAdmin(String chatId, Long userId, Long callerId) {
+        ChatRoom chatRoom = chatRoomRepository.findById(chatId)
+                .orElseThrow(() -> new RuntimeException("Chat room not found"));
+        requireCreatorOrSuperadmin(chatRoom, callerId);
+        chatRoom.getGroupAdminUserIds().add(userId);
+        chatRoomRepository.save(chatRoom);
+    }
+
+    /**
+     * Снять роль админа группы - может создатель группы или суперадмин.
+     * Demote a group admin - only the group's creator or a superadmin.
+     */
+    @Transactional
+    public void demoteGroupAdmin(String chatId, Long userId, Long callerId) {
+        ChatRoom chatRoom = chatRoomRepository.findById(chatId)
+                .orElseThrow(() -> new RuntimeException("Chat room not found"));
+        requireCreatorOrSuperadmin(chatRoom, callerId);
+        chatRoom.getGroupAdminUserIds().remove(userId);
+        chatRoomRepository.save(chatRoom);
+    }
+
+    /**
+     * Назначить участника редактором - может создатель, админ группы или суперадмин.
+     * Promote a participant to editor - the creator, a group admin, or a superadmin.
+     */
+    @Transactional
+    public void promoteEditor(String chatId, Long userId, Long callerId) {
+        ChatRoom chatRoom = chatRoomRepository.findById(chatId)
+                .orElseThrow(() -> new RuntimeException("Chat room not found"));
+        boolean isCreator = chatRoom.getCreatedBy().getId().equals(callerId);
+        boolean isGroupAdmin = chatRoom.getGroupAdminUserIds().contains(callerId);
+        boolean isSuperadmin = userRepository.findById(callerId).map(User::isSuperadmin).orElse(false);
+        if (!isCreator && !isGroupAdmin && !isSuperadmin) {
+            throw new RuntimeException("Only the creator, a group admin, or a superadmin can manage editors");
+        }
+        chatRoom.getEditorUserIds().add(userId);
+        chatRoomRepository.save(chatRoom);
+    }
+
+    /**
+     * Снять роль редактора - может создатель, админ группы или суперадмин.
+     * Demote an editor - the creator, a group admin, or a superadmin.
+     */
+    @Transactional
+    public void demoteEditor(String chatId, Long userId, Long callerId) {
+        ChatRoom chatRoom = chatRoomRepository.findById(chatId)
+                .orElseThrow(() -> new RuntimeException("Chat room not found"));
+        boolean isCreator = chatRoom.getCreatedBy().getId().equals(callerId);
+        boolean isGroupAdmin = chatRoom.getGroupAdminUserIds().contains(callerId);
+        boolean isSuperadmin = userRepository.findById(callerId).map(User::isSuperadmin).orElse(false);
+        if (!isCreator && !isGroupAdmin && !isSuperadmin) {
+            throw new RuntimeException("Only the creator, a group admin, or a superadmin can manage editors");
+        }
+        chatRoom.getEditorUserIds().remove(userId);
+        chatRoomRepository.save(chatRoom);
+    }
+
+    /**
+     * Заблокировать вход пользователю - только для суперадмина. Ставит
+     * User.blacklisted = true, из-за чего isEnabled() вернёт false, и Spring
+     * Security сам откажет в аутентификации при следующей попытке входа.
+     * Blacklist a user's login - superadmin only. Sets User.blacklisted =
+     * true, so isEnabled() returns false and Spring Security itself refuses
+     * authentication on the next login attempt.
+     */
+    @Transactional
+    public void blacklistUser(Long targetUserId, Long callerId) {
+        User caller = userRepository.findById(callerId)
+                .orElseThrow(() -> new RuntimeException("Caller not found"));
+        if (!caller.isSuperadmin()) {
+            throw new RuntimeException("Only a superadmin can blacklist users");
+        }
+        User target = userRepository.findById(targetUserId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        target.setBlacklisted(true);
+        userRepository.save(target);
+    }
+
+    /**
+     * Снять блокировку входа - только для суперадмина.
+     * Un-blacklist a user's login - superadmin only.
+     */
+    @Transactional
+    public void unblacklistUser(Long targetUserId, Long callerId) {
+        User caller = userRepository.findById(callerId)
+                .orElseThrow(() -> new RuntimeException("Caller not found"));
+        if (!caller.isSuperadmin()) {
+            throw new RuntimeException("Only a superadmin can unblacklist users");
+        }
+        User target = userRepository.findById(targetUserId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        target.setBlacklisted(false);
+        userRepository.save(target);
     }
 
     /**
@@ -356,7 +504,15 @@ public class ChatService {
             chatRoom.getHiddenForUserIds().add(userId);
             boolean hiddenForEveryone = chatRoom.getParticipants().stream()
                     .allMatch(u -> chatRoom.getHiddenForUserIds().contains(u.getId()));
-            if (hiddenForEveryone) {
+            // Блокнот - исключение: обычный пользователь может только скрыть его,
+            // не удалить безвозвратно (см. deleteChat для суперадмина). Скрытый
+            // чат просто перестаёт возвращаться из getChatsForUser - при следующем
+            // входе мобильное приложение создаст новый блокнот автоматически.
+            // The notebook is an exception: a regular user can only hide it, not
+            // delete it permanently (see deleteChat for the superadmin path). A
+            // hidden chat simply stops being returned by getChatsForUser - the
+            // mobile app auto-provisions a fresh notebook on the next load.
+            if (hiddenForEveryone && !NOTEBOOK_MARKER.equals(chatRoom.getName())) {
                 deleteRoomAndMessages(chatRoom);
                 log.info("Chat {} deleted - hidden for all participants", chatId);
                 return;

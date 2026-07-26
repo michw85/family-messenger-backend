@@ -49,6 +49,26 @@ public class User implements UserDetails {
     @Column(name = "fcm_token")
     private String fcmToken;
 
+    /**
+     * Глобальная роль владельца приложения - может удалять любой чат (в т.ч.
+     * чужие блокноты) и блокировать вход другим пользователям. Нет UI для
+     * назначения - выставляется вручную в БД один раз для реального владельца.
+     * The app owner's global role - can delete any chat (including other
+     * users' notebooks) and block other users' login. No UI to assign it -
+     * set manually in the DB once for the real owner.
+     */
+    @Column(name = "is_superadmin", nullable = false, columnDefinition = "boolean default false")
+    private boolean isSuperadmin = false;
+
+    /**
+     * Заблокирован суперадмином - см. isEnabled() ниже, Spring Security сам
+     * откажет в логине такому пользователю.
+     * Blacklisted by a superadmin - see isEnabled() below, Spring Security
+     * itself refuses login for such a user.
+     */
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    private boolean blacklisted = false;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
@@ -77,7 +97,7 @@ public class User implements UserDetails {
     public boolean isCredentialsNonExpired() { return true; }
 
     @Override
-    public boolean isEnabled() { return true; }
+    public boolean isEnabled() { return !blacklisted; }
 
     public enum UserStatus {
         ONLINE, OFFLINE, AWAY

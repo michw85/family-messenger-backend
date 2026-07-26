@@ -6,6 +6,7 @@ import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import com.familymessenger.backend.entity.ChatRoom;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -29,6 +30,12 @@ public class ChatRoomDto {
     @Builder.Default
     private boolean mutedForCurrentUser = false; // Заглушён ли чат для запрашивающего пользователя /
                                                   // Whether the chat is muted for the requesting user
+    @Builder.Default
+    private List<Long> groupAdminUserIds = new ArrayList<>(); // ID участников-админов группы (в дополнение к создателю) /
+                                                  // IDs of participants promoted to group admin (in addition to the creator)
+    @Builder.Default
+    private List<Long> editorUserIds = new ArrayList<>();     // ID участников-редакторов группы /
+                                                  // IDs of the group's editor/moderator participants
 
     /**
      * Конвертирует Entity в DTO
@@ -73,6 +80,8 @@ public class ChatRoomDto {
                 .createdAt(chatRoom.getCreatedAt())
                 .updatedAt(chatRoom.getUpdatedAt())
                 .lastActivityAt(lastActivityAt != null ? lastActivityAt : chatRoom.getCreatedAt())
+                .groupAdminUserIds(new ArrayList<>(chatRoom.getGroupAdminUserIds()))
+                .editorUserIds(new ArrayList<>(chatRoom.getEditorUserIds()))
                 .build();
     }
 }

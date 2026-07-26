@@ -64,6 +64,29 @@ public class ChatRoom {
     private Set<Long> mutedForUserIds = new HashSet<>();
 
     /**
+     * ID участников, назначенных админами этой группы (в дополнение к
+     * создателю) - могут удалить группу и кикать участников, как и создатель.
+     * IDs of participants promoted to admin of this group (in addition to
+     * the creator) - can delete the group and kick participants, same as
+     * the creator.
+     */
+    @ElementCollection
+    @CollectionTable(name = "chat_group_admins", joinColumns = @JoinColumn(name = "chat_room_id"))
+    @Column(name = "user_id")
+    private Set<Long> groupAdminUserIds = new HashSet<>();
+
+    /**
+     * ID участников-редакторов этой группы - могут кикать других участников
+     * за нарушение правил, но не могут удалить саму группу.
+     * IDs of this group's editor/moderator participants - can kick other
+     * participants for breaking the rules, but cannot delete the group itself.
+     */
+    @ElementCollection
+    @CollectionTable(name = "chat_editors", joinColumns = @JoinColumn(name = "chat_room_id"))
+    @Column(name = "user_id")
+    private Set<Long> editorUserIds = new HashSet<>();
+
+    /**
      * Время, до которого каждый участник прочитал сообщения в этом чате
      * (используется для галочек "прочитано" - сообщение считается прочитанным
      * всеми, если время последнего сообщения не позже lastReadAt каждого

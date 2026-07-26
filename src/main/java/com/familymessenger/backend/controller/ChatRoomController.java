@@ -443,6 +443,62 @@ public class ChatRoomController {
     }
 
     /**
+     * Назначить/снять роль админа группы - создатель или суперадмин
+     * Promote/demote a group admin - the creator or a superadmin
+     */
+    @PostMapping("/{chatId}/admins/{userId}")
+    public ResponseEntity<?> promoteGroupAdmin(@PathVariable String chatId,
+                                                @PathVariable Long userId,
+                                                @AuthenticationPrincipal User user) {
+        try {
+            chatService.promoteGroupAdmin(chatId, userId, user.getId());
+            return ResponseEntity.noContent().build();
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        }
+    }
+
+    @DeleteMapping("/{chatId}/admins/{userId}")
+    public ResponseEntity<?> demoteGroupAdmin(@PathVariable String chatId,
+                                               @PathVariable Long userId,
+                                               @AuthenticationPrincipal User user) {
+        try {
+            chatService.demoteGroupAdmin(chatId, userId, user.getId());
+            return ResponseEntity.noContent().build();
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        }
+    }
+
+    /**
+     * Назначить/снять роль редактора группы - создатель, админ группы или суперадмин
+     * Promote/demote a group editor - the creator, a group admin, or a superadmin
+     */
+    @PostMapping("/{chatId}/editors/{userId}")
+    public ResponseEntity<?> promoteEditor(@PathVariable String chatId,
+                                            @PathVariable Long userId,
+                                            @AuthenticationPrincipal User user) {
+        try {
+            chatService.promoteEditor(chatId, userId, user.getId());
+            return ResponseEntity.noContent().build();
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        }
+    }
+
+    @DeleteMapping("/{chatId}/editors/{userId}")
+    public ResponseEntity<?> demoteEditor(@PathVariable String chatId,
+                                           @PathVariable Long userId,
+                                           @AuthenticationPrincipal User user) {
+        try {
+            chatService.demoteEditor(chatId, userId, user.getId());
+            return ResponseEntity.noContent().build();
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        }
+    }
+
+    /**
      * Создать групповой чат с участниками
      * Create group chat with participants
      *

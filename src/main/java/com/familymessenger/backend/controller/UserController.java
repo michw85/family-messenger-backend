@@ -3,6 +3,7 @@ package com.familymessenger.backend.controller;
 import com.familymessenger.backend.dto.UserDto;
 import com.familymessenger.backend.entity.User;
 import com.familymessenger.backend.security.RateLimiterService;
+import com.familymessenger.backend.service.ChatService;
 import com.familymessenger.backend.service.FileService;
 import com.familymessenger.backend.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,7 @@ public class UserController {
     private final UserService userService;
     private final FileService fileService;
     private final RateLimiterService rateLimiterService;
+    private final ChatService chatService;
 
     /**
      * Поиск пользователей по имени или email (не включая текущего)
@@ -100,6 +102,32 @@ public class UserController {
             log.error("Failed to upload avatar: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Failed to upload avatar / Ошибка загрузки аватара");
+        }
+    }
+
+    /**
+     * Заблокировать/разблокировать вход пользователю - только для суперадмина
+     * Blacklist/un-blacklist a user's login - superadmin only
+     */
+    @PostMapping("/{userId}/blacklist")
+    public ResponseEntity<?> blacklistUser(@PathVariable Long userId,
+                                            @AuthenticationPrincipal User currentUser) {
+        try {
+            chatService.blacklistUser(userId, currentUser.getId());
+            return ResponseEntity.noContent().build();
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        }
+    }
+
+    @DeleteMapping("/{userId}/blacklist")
+    public ResponseEntity<?> unblacklistUser(@PathVariable Long userId,
+                                              @AuthenticationPrincipal User currentUser) {
+        try {
+            chatService.unblacklistUser(userId, currentUser.getId());
+            return ResponseEntity.noContent().build();
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
         }
     }
 }

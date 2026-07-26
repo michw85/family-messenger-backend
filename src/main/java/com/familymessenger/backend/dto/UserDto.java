@@ -19,6 +19,7 @@ public class UserDto {
     private User.UserStatus status;
     private LocalDateTime lastSeen;
     private LocalDateTime createdAt;
+    private boolean isSuperadmin;
 
     // Конвертация из Entity в DTO
     public static UserDto fromEntity(User user) {
@@ -30,6 +31,7 @@ public class UserDto {
                 .status(user.getStatus())
                 .lastSeen(user.getLastSeen())
                 .createdAt(user.getCreatedAt())
+                .isSuperadmin(user.isSuperadmin())
                 .build();
     }
 
