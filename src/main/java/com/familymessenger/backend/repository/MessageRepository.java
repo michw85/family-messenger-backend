@@ -4,6 +4,7 @@ import com.familymessenger.backend.entity.Message;
 import com.familymessenger.backend.entity.ChatRoom;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -56,4 +57,20 @@ public interface MessageRepository extends JpaRepository<Message, String> {
     @Query("SELECT m FROM Message m WHERE m.mediaExpiresAt IS NOT NULL " +
             "AND m.mediaExpiresAt < :cutoff AND m.mediaDeletedFromStorage = false")
     List<Message> findExpiredMedia(@Param("cutoff") LocalDateTime cutoff);
+
+    /**
+     * Удаляет все сообщения чата одним запросом (а не по одному) - так
+     * self-reference reply_to_id между сообщениями одного чата не мешает
+     * удалению (Postgres проверяет внешние ключи по завершении всего
+     * запроса, а не построчно). Нужно перед удалением самой ChatRoom -
+     * иначе внешний ключ chat_room_id не даст её стереть.
+     * Deletes all of a chat's messages in a single statement (not one by
+     * one) - so the reply_to_id self-reference between messages in the same
+     * chat doesn't get in the way (Postgres checks foreign keys after the
+     * whole statement completes, not row by row). Needed before deleting the
+     * ChatRoom itself - otherwise the chat_room_id foreign key blocks it.
+     */
+    @Modifying
+    @Query("DELETE FROM Message m WHERE m.chatRoom = :chatRoom")
+    void deleteByChatRoom(@Param("chatRoom") ChatRoom chatRoom);
 }

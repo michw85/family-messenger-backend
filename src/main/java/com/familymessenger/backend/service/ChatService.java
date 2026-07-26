@@ -232,9 +232,22 @@ public class ChatService {
             throw new RuntimeException("Only creator can delete chat");
         }
 
-        // Можно также удалить все сообщения (каскадно, если настроено в JPA)
-        chatRoomRepository.delete(chatRoom);
+        deleteRoomAndMessages(chatRoom);
         log.info("Chat deleted: {}", chatId);
+    }
+
+    /**
+     * Удаляет реакции и сообщения чата, затем сам чат - в этом порядке,
+     * иначе внешние ключи (message_id у реакций, chat_room_id у сообщений)
+     * не дадут удалить родительские записи.
+     * Deletes a chat's reactions and messages, then the chat itself - in
+     * this order, otherwise the foreign keys (message_id on reactions,
+     * chat_room_id on messages) block deleting the parent rows.
+     */
+    private void deleteRoomAndMessages(ChatRoom chatRoom) {
+        messageReactionRepository.deleteByMessageChatRoom(chatRoom);
+        messageRepository.deleteByChatRoom(chatRoom);
+        chatRoomRepository.delete(chatRoom);
     }
 
     public List<User> getParticipants(String chatRoomId) {
@@ -335,7 +348,7 @@ public class ChatService {
         if (chatRoom.getType() == ChatRoom.RoomType.GROUP) {
             chatRoom.getParticipants().removeIf(u -> u.getId().equals(userId));
             if (chatRoom.getParticipants().isEmpty()) {
-                chatRoomRepository.delete(chatRoom);
+                deleteRoomAndMessages(chatRoom);
                 log.info("Chat {} deleted - last participant left", chatId);
                 return;
             }
@@ -344,7 +357,7 @@ public class ChatService {
             boolean hiddenForEveryone = chatRoom.getParticipants().stream()
                     .allMatch(u -> chatRoom.getHiddenForUserIds().contains(u.getId()));
             if (hiddenForEveryone) {
-                chatRoomRepository.delete(chatRoom);
+                deleteRoomAndMessages(chatRoom);
                 log.info("Chat {} deleted - hidden for all participants", chatId);
                 return;
             }
