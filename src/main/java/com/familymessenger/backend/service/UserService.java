@@ -49,6 +49,12 @@ public class UserService {
         // Set status ONLINE (by default)
         user.setStatus(User.UserStatus.ONLINE);
 
+        // Новая регистрация ждёт подтверждения суперадмина, прежде чем сможет
+        // реально войти - см. AuthController.register/login и User.isEnabled()
+        // A new registration awaits superadmin approval before it can actually
+        // log in - see AuthController.register/login and User.isEnabled()
+        user.setApproved(false);
+
         // Сохраняем в базу данных
         // Save to database
         User savedUser = userRepository.save(user);
@@ -168,5 +174,55 @@ public class UserService {
         user.setPassword(passwordEncoder.encode(rawNewPassword));
         userRepository.save(user);
         log.info("Password updated for user: {}", user.getUsername());
+    }
+
+    /**
+     * Список пользователей, ожидающих подтверждения - только для суперадмина.
+     * List of users awaiting approval - superadmin only.
+     */
+    @Transactional(readOnly = true)
+    public List<User> getPendingApprovalUsers(Long callerId) {
+        requireSuperadmin(callerId, "view pending registrations");
+        return userRepository.findPendingApproval();
+    }
+
+    /**
+     * Подтвердить регистрацию - только суперадмин.
+     * Approve a registration - superadmin only.
+     */
+    @Transactional
+    public void approveUser(Long targetUserId, Long callerId) {
+        requireSuperadmin(callerId, "approve registrations");
+        User target = findById(targetUserId);
+        target.setApproved(true);
+        userRepository.save(target);
+        log.info("User {} approved by superadmin {}", target.getUsername(), callerId);
+    }
+
+    /**
+     * Отклонить регистрацию - только суперадмин. Не удаляет аккаунт (проще и
+     * безопаснее, чем разбираться с внешними ключами на ещё не тронутой
+     * записи), а помечает заблокированным - тот же эффект по входу, и запись
+     * больше не появится в списке ожидающих (см. findPendingApproval).
+     * Reject a registration - superadmin only. Doesn't delete the account
+     * (simpler and safer than dealing with foreign keys on an otherwise
+     * untouched row) - marks it blacklisted instead, which has the same
+     * effect on login and drops it out of the pending list (see
+     * findPendingApproval).
+     */
+    @Transactional
+    public void rejectUser(Long targetUserId, Long callerId) {
+        requireSuperadmin(callerId, "reject registrations");
+        User target = findById(targetUserId);
+        target.setBlacklisted(true);
+        userRepository.save(target);
+        log.info("User {} rejected by superadmin {}", target.getUsername(), callerId);
+    }
+
+    private void requireSuperadmin(Long callerId, String action) {
+        User caller = findById(callerId);
+        if (!caller.isSuperadmin()) {
+            throw new RuntimeException("Only a superadmin can " + action);
+        }
     }
 }

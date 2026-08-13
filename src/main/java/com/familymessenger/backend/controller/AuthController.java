@@ -14,6 +14,7 @@ import com.familymessenger.backend.security.PasswordResetService;
 import com.familymessenger.backend.security.RateLimiterService;
 import com.familymessenger.backend.security.RefreshTokenService;
 import com.familymessenger.backend.service.EmailService;
+import com.familymessenger.backend.service.FcmService;
 import com.familymessenger.backend.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -22,6 +23,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -49,6 +51,7 @@ public class AuthController {
     private final EmailService emailService;
     private final PasswordResetService passwordResetService;
     private final RateLimiterService rateLimiterService;
+    private final FcmService fcmService;
 
     /**
      * IP клиента с учётом обратного прокси (nginx перед бэкендом на droplet'е)
@@ -105,6 +108,27 @@ public class AuthController {
         // Создаём нового пользователя
         // Create new user
         User user = userService.registerNewUser(request);
+        log.info("User registered, pending superadmin approval: {}", user.getUsername());
+        notifySuperadminsOfPendingRegistration(user);
+
+        // Новый пользователь ждёт подтверждения суперадмина (approved=false, см.
+        // UserService.registerNewUser) - НЕ выдаём токен сразу, иначе approved
+        // никак не проверялся бы при самой первой сессии (JWT/refresh-токен уже
+        // были бы у него на руках). Мобильный клиент должен показать экран
+        // ожидания вместо перехода в приложение.
+        // A new user awaits superadmin approval (approved=false, see
+        // UserService.registerNewUser) - do NOT issue a token right away,
+        // otherwise approved would never be checked for the very first session
+        // (they'd already be holding a valid JWT/refresh token). The mobile
+        // client should show a waiting screen instead of entering the app.
+        if (!user.isApproved()) {
+            return ResponseEntity
+                    .status(HttpStatus.ACCEPTED)
+                    .body(Map.of(
+                            "pendingApproval", true,
+                            "message", "Registration received, awaiting approval / Регистрация получена, ожидает подтверждения"
+                    ));
+        }
 
         // Генерируем JWT токен и refresh-токен
         // Generate JWT access token and refresh token
@@ -122,6 +146,29 @@ public class AuthController {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(new AuthResponse(jwt, refreshToken, userDto));
+    }
+
+    /**
+     * Лучшее усилие: уведомляет всех суперадминов пушем о новой заявке на
+     * регистрацию. Не критично для самой регистрации - ошибка здесь не должна
+     * мешать пользователю зарегистрироваться.
+     * Best-effort: pushes a notification to every superadmin about a new
+     * registration request. Not critical to registration itself - a failure
+     * here shouldn't stop the user from registering.
+     */
+    private void notifySuperadminsOfPendingRegistration(User newUser) {
+        try {
+            userRepository.findAllSuperadmins().stream()
+                    .map(User::getFcmToken)
+                    .filter(token -> token != null && !token.isEmpty())
+                    .forEach(token -> fcmService.sendPushNotification(
+                            token,
+                            "New registration pending / Новая заявка на регистрацию",
+                            newUser.getUsername() + " is awaiting approval / ожидает подтверждения"
+                    ));
+        } catch (Exception e) {
+            log.warn("Failed to notify superadmins of pending registration: {}", e.getMessage());
+        }
     }
 
     /**
@@ -155,6 +202,23 @@ public class AuthController {
             );
 
             user = userService.findByUsername(request.getUsername());
+        } catch (DisabledException e) {
+            // isEnabled()=false до проверки пароля (см. AbstractUserDetailsAuthenticationProvider) -
+            // не считаем это неудачной попыткой (пароль мог быть верным) и различаем причину
+            // isEnabled()=false fires before the password check (see
+            // AbstractUserDetailsAuthenticationProvider) - not counted as a failed attempt
+            // (the password could well have been correct) and we distinguish the reason
+            User disabledUser = userService.findByUsername(request.getUsername());
+            if (!disabledUser.isApproved()) {
+                log.info("Login rejected - pending approval: {}", request.getUsername());
+                return ResponseEntity
+                        .status(HttpStatus.FORBIDDEN)
+                        .body("Your account is awaiting superadmin approval / Ваш аккаунт ожидает подтверждения администратором");
+            }
+            log.info("Login rejected - blacklisted: {}", request.getUsername());
+            return ResponseEntity
+                    .status(HttpStatus.FORBIDDEN)
+                    .body("Your account has been blocked / Ваш аккаунт заблокирован");
         } catch (Exception e) {
             // Неверный пароль/username - это единственный случай, который считаем неудачной попыткой
             // Wrong password/username - the only case counted as a failed attempt

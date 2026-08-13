@@ -88,6 +88,10 @@ public class JwtTokenProvider {
             log.error("JWT token is expired: {}", e.getMessage());
         } catch (UnsupportedJwtException e) {
             log.error("JWT token is unsupported: {}", e.getMessage());
+        } catch (io.jsonwebtoken.security.SignatureException e) {
+            // Неверная подпись - другой секрет или изменённое содержимое токена
+            // Invalid signature - a different secret or tampered token content
+            log.error("Invalid JWT signature: {}", e.getMessage());
         } catch (IllegalArgumentException e) {
             log.error("JWT claims string is empty: {}", e.getMessage());
         }

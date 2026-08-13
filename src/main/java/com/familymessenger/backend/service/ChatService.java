@@ -297,6 +297,19 @@ public class ChatService {
         ChatRoom chatRoom = chatRoomRepository.findById(chatId)
                 .orElseThrow(() -> new RuntimeException("Chat room not found"));
 
+        // Личные чаты (DIRECT/FAMILY, включая блокнот) рассчитаны ровно на своих
+        // изначальных участников - notebook.isNotebookChat, скрытие при взаимном
+        // выходе и т.д. на фронте и бэкенде подразумевают "не больше исходных
+        // двух". Если нужен групповой чат - для этого есть createGroupChat.
+        // Personal chats (DIRECT/FAMILY, including the notebook) are meant to
+        // stay exactly at their original participants - notebook.isNotebookChat,
+        // mutual-hide-on-leave, etc. on both the frontend and backend assume "no
+        // more than the original two". If a group is wanted, that's what
+        // createGroupChat is for.
+        if (chatRoom.getType() != ChatRoom.RoomType.GROUP) {
+            throw new RuntimeException("Cannot add participants to a personal chat - create a group chat instead");
+        }
+
         // Проверяем, что текущий пользователь является участником / Check current user is participant
         boolean isParticipant = chatRoom.getParticipants().stream()
                 .anyMatch(u -> u.getId().equals(currentUserId));
@@ -371,9 +384,26 @@ public class ChatService {
     public void promoteGroupAdmin(String chatId, Long userId, Long callerId) {
         ChatRoom chatRoom = chatRoomRepository.findById(chatId)
                 .orElseThrow(() -> new RuntimeException("Chat room not found"));
+        requireGroupChat(chatRoom);
         requireCreatorOrSuperadmin(chatRoom, callerId);
         chatRoom.getGroupAdminUserIds().add(userId);
         chatRoomRepository.save(chatRoom);
+    }
+
+    /**
+     * Роли админа/редактора группы существуют только для групповых чатов -
+     * в личном (DIRECT) чате "групповой админ" был бы бессмысленной ролью,
+     * которая к тому же давала бы право на полное удаление этого личного
+     * чата в обход обычной логики "скрыть, пока не скроют оба" (см. deleteChat).
+     * Group admin/editor roles only exist for group chats - in a personal
+     * (DIRECT) chat, "group admin" would be a meaningless role that would
+     * also grant the right to fully delete that personal chat, bypassing the
+     * usual "hide until both sides hide" logic (see deleteChat).
+     */
+    private void requireGroupChat(ChatRoom chatRoom) {
+        if (chatRoom.getType() != ChatRoom.RoomType.GROUP) {
+            throw new RuntimeException("Group admin/editor roles only apply to group chats");
+        }
     }
 
     /**
@@ -384,6 +414,7 @@ public class ChatService {
     public void demoteGroupAdmin(String chatId, Long userId, Long callerId) {
         ChatRoom chatRoom = chatRoomRepository.findById(chatId)
                 .orElseThrow(() -> new RuntimeException("Chat room not found"));
+        requireGroupChat(chatRoom);
         requireCreatorOrSuperadmin(chatRoom, callerId);
         chatRoom.getGroupAdminUserIds().remove(userId);
         chatRoomRepository.save(chatRoom);
@@ -397,6 +428,7 @@ public class ChatService {
     public void promoteEditor(String chatId, Long userId, Long callerId) {
         ChatRoom chatRoom = chatRoomRepository.findById(chatId)
                 .orElseThrow(() -> new RuntimeException("Chat room not found"));
+        requireGroupChat(chatRoom);
         boolean isCreator = chatRoom.getCreatedBy().getId().equals(callerId);
         boolean isGroupAdmin = chatRoom.getGroupAdminUserIds().contains(callerId);
         boolean isSuperadmin = userRepository.findById(callerId).map(User::isSuperadmin).orElse(false);
@@ -415,6 +447,7 @@ public class ChatService {
     public void demoteEditor(String chatId, Long userId, Long callerId) {
         ChatRoom chatRoom = chatRoomRepository.findById(chatId)
                 .orElseThrow(() -> new RuntimeException("Chat room not found"));
+        requireGroupChat(chatRoom);
         boolean isCreator = chatRoom.getCreatedBy().getId().equals(callerId);
         boolean isGroupAdmin = chatRoom.getGroupAdminUserIds().contains(callerId);
         boolean isSuperadmin = userRepository.findById(callerId).map(User::isSuperadmin).orElse(false);

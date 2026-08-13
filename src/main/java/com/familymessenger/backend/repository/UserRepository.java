@@ -31,4 +31,28 @@ public interface UserRepository extends JpaRepository<User, Long> {
             "OR LOWER(u.email) LIKE LOWER(CONCAT('%', :query, '%'))) " +
             "AND u.id != :currentUserId")
     List<User> searchUsers(@Param("query") String query, @Param("currentUserId") Long currentUserId);
+
+    /**
+     * Зарегистрировавшиеся, но ещё не подтверждённые суперадмином (и ещё не
+     * отклонённые - отклонённые просто остаются заблокированы, но не должны
+     * бесконечно маячить в списке "ожидающих"). Явный JPQL, а не производный
+     * метод по имени - производные запросы по boolean-полю с префиксом "is"
+     * (isSuperadmin) на этом проекте уже один раз давали не то имя свойства.
+     * Signed up but not yet approved by a superadmin (and not yet rejected -
+     * rejected users just stay blacklisted, but shouldn't linger forever in
+     * the "pending" list). Explicit JPQL rather than a derived method name -
+     * derived queries on an "is"-prefixed boolean field (isSuperadmin) have
+     * already bitten this project once with the wrong property name.
+     */
+    @Query("SELECT u FROM User u WHERE u.approved = false AND u.blacklisted = false")
+    List<User> findPendingApproval();
+
+    /**
+     * Все суперадмины - используется, чтобы уведомить их о новой заявке на
+     * регистрацию, ожидающей подтверждения.
+     * All superadmins - used to notify them about a new registration
+     * pending approval.
+     */
+    @Query("SELECT u FROM User u WHERE u.isSuperadmin = true")
+    List<User> findAllSuperadmins();
 }

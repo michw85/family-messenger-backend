@@ -130,4 +130,50 @@ public class UserController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
         }
     }
+
+    /**
+     * Список регистраций, ожидающих подтверждения - только для суперадмина
+     * List of registrations awaiting approval - superadmin only
+     */
+    @GetMapping("/pending-approval")
+    public ResponseEntity<?> getPendingApprovalUsers(@AuthenticationPrincipal User currentUser) {
+        try {
+            List<UserDto> dtos = userService.getPendingApprovalUsers(currentUser.getId()).stream()
+                    .map(UserDto::fromEntity)
+                    .collect(Collectors.toList());
+            return ResponseEntity.ok(dtos);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        }
+    }
+
+    /**
+     * Подтвердить регистрацию - только суперадмин
+     * Approve a registration - superadmin only
+     */
+    @PostMapping("/{userId}/approve")
+    public ResponseEntity<?> approveUser(@PathVariable Long userId,
+                                          @AuthenticationPrincipal User currentUser) {
+        try {
+            userService.approveUser(userId, currentUser.getId());
+            return ResponseEntity.noContent().build();
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        }
+    }
+
+    /**
+     * Отклонить регистрацию - только суперадмин
+     * Reject a registration - superadmin only
+     */
+    @PostMapping("/{userId}/reject")
+    public ResponseEntity<?> rejectUser(@PathVariable Long userId,
+                                         @AuthenticationPrincipal User currentUser) {
+        try {
+            userService.rejectUser(userId, currentUser.getId());
+            return ResponseEntity.noContent().build();
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        }
+    }
 }

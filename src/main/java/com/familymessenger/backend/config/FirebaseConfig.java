@@ -6,6 +6,7 @@ import com.google.firebase.FirebaseOptions;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -33,6 +34,13 @@ public class FirebaseConfig {
     @Value("${firebase.credentials-path:}")
     private String credentialsPath;
 
+    /**
+     * Отключено под тестовым профилем - у контекстного теста (см.
+     * BackendApplicationTests) нет и не должно быть настоящих credentials.
+     * Disabled under the test profile - the context test (see
+     * BackendApplicationTests) has no real credentials and shouldn't need any.
+     */
+    @Profile("!test")
     @Bean
     public FirebaseApp firebaseApp() throws IOException {
         if (credentialsPath == null || credentialsPath.isBlank()) {

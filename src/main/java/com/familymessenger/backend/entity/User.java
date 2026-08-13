@@ -69,6 +69,25 @@ public class User implements UserDetails {
     @Column(nullable = false, columnDefinition = "boolean default false")
     private boolean blacklisted = false;
 
+    /**
+     * Подтверждён ли суперадмином вход этому пользователю. Новые регистрации
+     * создаются с approved=false (см. UserService.registerNewUser) - защита
+     * от того, что случайные люди, скачавшие приложение (например, с
+     * закрытого трека Google Play), смогут им пользоваться без ведома
+     * владельца. columnDefinition default TRUE - иначе при авто-миграции
+     * схемы уже существующие (и так пользующиеся приложением) пользователи
+     * внезапно потеряли бы доступ.
+     * Whether a superadmin has approved this user's login. New registrations
+     * are created with approved=false (see UserService.registerNewUser) -
+     * guards against random people who got hold of the app (e.g. via a
+     * closed Google Play testing track) being able to use it without the
+     * owner's knowledge. columnDefinition defaults to TRUE - otherwise the
+     * schema auto-migration would suddenly lock out everyone already using
+     * the app.
+     */
+    @Column(nullable = false, columnDefinition = "boolean default true")
+    private boolean approved = true;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
@@ -97,7 +116,7 @@ public class User implements UserDetails {
     public boolean isCredentialsNonExpired() { return true; }
 
     @Override
-    public boolean isEnabled() { return !blacklisted; }
+    public boolean isEnabled() { return !blacklisted && approved; }
 
     public enum UserStatus {
         ONLINE, OFFLINE, AWAY

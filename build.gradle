@@ -59,4 +59,8 @@ dependencies {
 
 tasks.named('test') {
 	useJUnitPlatform()
+	// Mockito's inline mock maker (needed to mock concrete classes like
+	// StringRedisTemplate) self-attaches a Java agent to the test JVM - this
+	// flag is required for that self-attach to work under JDK 9+.
+	jvmArgs '-Djdk.attach.allowAttachSelf=true'
 }

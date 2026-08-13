@@ -59,6 +59,22 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 // Load user details from database
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
 
+                // isEnabled() (не заблокирован, подтверждён суперадмином) проверяется
+                // только при логине через DaoAuthenticationProvider - сам по себе валидный
+                // JWT это не учитывает. Без этой проверки уже выданный токен продолжал бы
+                // работать для заблокированного/ещё не подтверждённого пользователя вплоть
+                // до истечения (access-токен короткоживущий, но не мгновенно).
+                // isEnabled() (not blacklisted, approved by a superadmin) is only checked at
+                // login time via DaoAuthenticationProvider - a merely-valid JWT doesn't
+                // account for it. Without this check, an already-issued token would keep
+                // working for a blacklisted/not-yet-approved user until it expires (the
+                // access token is short-lived, but not instant).
+                if (!userDetails.isEnabled()) {
+                    log.warn("Rejecting request: user {} is disabled (blacklisted or not yet approved)", username);
+                    filterChain.doFilter(request, response);
+                    return;
+                }
+
                 // Создаем объект аутентификации
                 // Create authentication object
                 UsernamePasswordAuthenticationToken authentication =
