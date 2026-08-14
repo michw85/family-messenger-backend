@@ -1,6 +1,7 @@
 package com.familymessenger.backend.controller;
 
 import com.familymessenger.backend.dto.ChatMessageDto;
+import com.familymessenger.backend.entity.ChatRoom;
 import com.familymessenger.backend.entity.Message;
 import com.familymessenger.backend.entity.User;
 import com.familymessenger.backend.service.ChatService;
@@ -113,17 +114,35 @@ public class MessageController {
             }*/
         try {
             List<String> tokens = chatService.getParticipantFcmTokens(roomId, sender.getId());
+            ChatRoom chatRoom = savedMessage.getChatRoom();
+            // В групповых чатах одно только имя отправителя не говорит, из
+            // какого чата пришло сообщение (у человека может быть несколько
+            // общих групп) - добавляем название группы в заголовок. В личных
+            // чатах имя отправителя уже достаточно однозначно.
+            // In group chats the sender's name alone doesn't say which chat
+            // the message is from (two people can share several groups) - add
+            // the group name to the title. In personal chats the sender's
+            // name is already unambiguous.
+            String pushTitle = chatRoom.getType() == ChatRoom.RoomType.GROUP && chatRoom.getName() != null
+                    ? sender.getUsername() + " • " + chatRoom.getName()
+                    : "Новое сообщение от " + sender.getUsername();
+            // Капсула времени должна оставаться запечатанной до revealAt -
+            // пуш-уведомление не должно раскрывать текст раньше срока (см.
+            // ChatMessageDto.fromEntity, где то же самое скрывается при
+            // обычной загрузке истории).
+            // A time capsule must stay sealed until revealAt - the push
+            // notification must not reveal the text early (see
+            // ChatMessageDto.fromEntity, which hides the same thing when
+            // loading message history normally).
+            String pushBody = savedMessage.getRevealAt() != null
+                    ? "🎁 Time capsule / Капсула времени"
+                    : content;
             Map<String, String> pushData = Map.of(
                     "roomId", roomId,
-                    "roomName", savedMessage.getChatRoom().getName()
+                    "roomName", chatRoom.getName() != null ? chatRoom.getName() : ""
             );
             for (String token : tokens) {
-                fcmService.sendPushNotification(
-                        token,
-                        "Новое сообщение от " + sender.getUsername(),
-                        content,
-                        pushData
-                );
+                fcmService.sendPushNotification(token, pushTitle, pushBody, pushData);
             }
         } catch (Exception e) {
             log.error("Failed to send push notifications", e);

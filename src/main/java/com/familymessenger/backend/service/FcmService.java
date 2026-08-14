@@ -44,12 +44,18 @@ public class FcmService {
             // Должен совпадать с id канала, создаваемого в
             // notifications.ts::registerForPushNotificationsAsync - без этого
             // Expo целится в канал с буквальным именем "default", а не в тот,
-            // что реально зарегистрирован на устройстве.
+            // что реально зарегистрирован на устройстве. v3 - смягчённая
+            // вибрация (задача #93); id снова пришлось сменить, а не
+            // подправить v2 на месте, потому что Android-каналы неизменяемы
+            // после создания.
             // Must match the channel id created in
             // notifications.ts::registerForPushNotificationsAsync - without
             // this Expo targets a channel literally named "default" instead
-            // of the one actually registered on the device.
-            payload.put("channelId", "default-v2");
+            // of the one actually registered on the device. v3 - softened
+            // vibration (task #93); the id had to change again rather than
+            // editing v2 in place, because Android channels are immutable
+            // after creation.
+            payload.put("channelId", "default-v3");
             if (data != null && !data.isEmpty()) {
                 payload.put("data", data);
             }
